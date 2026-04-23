@@ -1,0 +1,17 @@
+-- AlterTable
+ALTER TABLE "Psychologist" ADD COLUMN     "isMale" BOOLEAN,
+ADD COLUMN     "specAltro" BOOLEAN DEFAULT false,
+ADD COLUMN     "specAnsia" BOOLEAN DEFAULT false,
+ADD COLUMN     "specAutostima" BOOLEAN DEFAULT false,
+ADD COLUMN     "specCoppia" BOOLEAN DEFAULT false,
+ADD COLUMN     "specDipendenze" BOOLEAN DEFAULT false,
+ADD COLUMN     "specDisturbiAlimentari" BOOLEAN DEFAULT false,
+ADD COLUMN     "specGenitorialita" BOOLEAN DEFAULT false,
+ADD COLUMN     "specInfanzia" BOOLEAN DEFAULT false,
+ADD COLUMN     "specLutto" BOOLEAN DEFAULT false,
+ADD COLUMN     "specNeurodivergenze" BOOLEAN DEFAULT false,
+ADD COLUMN     "specRelazioni" BOOLEAN DEFAULT false,
+ADD COLUMN     "specSessualita" BOOLEAN DEFAULT false,
+ADD COLUMN     "specStress" BOOLEAN DEFAULT false,
+ADD COLUMN     "specTrauma" BOOLEAN DEFAULT false,
+ADD COLUMN     "specUmore" BOOLEAN DEFAULT false;

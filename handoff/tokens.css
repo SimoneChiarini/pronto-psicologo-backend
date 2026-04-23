@@ -1,0 +1,73 @@
+/* prontoPsicologo — Design Tokens (Variante B · Denso & Clinico)
+   Importa questo file o copia le variabili nel tuo stylesheet globale. */
+
+:root {
+  /* Colori — palette monocromatica */
+  --color-bg: #ffffff;
+  --color-bg-subtle: #fafafa;
+  --color-bg-panel: #f7f7f7;
+  --color-bg-inverse: #0a0a0a;
+  --color-bg-inverse-hover: #232323;
+
+  --color-border: #e5e5e5;
+  --color-border-subtle: #ececec;
+  --color-border-faint: #f2f2f2;
+  --color-border-input: #d4d4d4;
+
+  --color-text: #111111;
+  --color-text-strong: #0a0a0a;
+  --color-text-muted: #666666;
+  --color-text-faint: #888888;
+  --color-text-inverse: #ffffff;
+  --color-text-placeholder: #999999;
+
+  /* Tipografia */
+  --font-sans: "Söhne", "Inter", "Helvetica Neue", Helvetica, Arial, sans-serif;
+  --font-mono: "JetBrains Mono", "SF Mono", Menlo, Consolas, monospace;
+
+  --text-xs: 10.5px;
+  --text-sm: 11.5px;
+  --text-base: 12.5px;
+  --text-md: 13.5px;
+  --text-lg: 14px;
+  --text-xl: 18px;
+  --text-2xl: 20px;
+  --text-3xl: 22px;
+
+  /* Spacing (4px scale) */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 14px;
+  --space-5: 16px;
+  --space-6: 20px;
+  --space-8: 28px;
+  --space-10: 40px;
+
+  /* Border radius */
+  --radius-sm: 3px;
+  --radius-md: 5px;
+  --radius-lg: 6px;
+  --radius-pill: 7px;
+  --radius-full: 50%;
+
+  /* Dimensioni fisse layout */
+  --size-rail: 56px;
+  --size-subnav: 220px;
+  --size-topbar: 40px;
+}
+
+/* Utility — numeri tabulari (applica a tutti i numeri in tabella/kpi) */
+.num, .mono {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+}
+
+/* Label uppercase */
+.label-upper {
+  font-size: var(--text-xs);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  font-weight: 600;
+  color: var(--color-text-muted);
+}

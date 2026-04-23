@@ -1,0 +1,14 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npm install *)",
+      "Bash(npm list *)",
+      "Bash(npx prisma *)",
+      "Bash(npx tsc *)",
+      "Bash(flutter analyze *)",
+      "Bash(flutter pub *)",
+      "Bash(flutter create *)",
+      "Bash(ipconfig)"
+    ]
+  }
+}

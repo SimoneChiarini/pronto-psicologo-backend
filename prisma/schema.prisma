@@ -1,0 +1,132 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id           String         @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  email        String         @unique @db.VarChar(255)
+  password     String         @db.VarChar(255)
+  role         String         @db.VarChar(50)
+  firstName    String?        @db.VarChar(100)
+  lastName     String?        @db.VarChar(100)
+  profileImage String?        @db.VarChar(500)
+  latitude     Float?
+  longitude    Float?
+  createdAt    DateTime?      @default(now()) @db.Timestamp(6)
+  Conversation  Conversation[]
+  psychologist  Psychologist?
+  questions     Question[]
+  Review        Review[]
+  sentMessages  Message[]
+}
+
+model Psychologist {
+  id                 String         @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId             String         @unique @db.Uuid
+  bio                String?
+  alboCode           String         @unique @db.VarChar(100)
+  verified           Boolean?       @default(false)
+  subscriptionActive Boolean?       @default(false)
+  REM                Boolean?       @default(false)
+  profileImage       String?        @db.VarChar(500)
+  address            String?        @db.VarChar(500)
+  phone              String?        @db.VarChar(20)
+  latitude           Float?
+  longitude          Float?
+  createdAt          DateTime?      @default(now()) @db.Timestamp(6)
+  isMale             Boolean?
+  specAnsia              Boolean?   @default(false)
+  specUmore              Boolean?   @default(false)
+  specStress             Boolean?   @default(false)
+  specRelazioni          Boolean?   @default(false)
+  specCoppia             Boolean?   @default(false)
+  specGenitorialita      Boolean?   @default(false)
+  specInfanzia           Boolean?   @default(false)
+  specAutostima          Boolean?   @default(false)
+  specTrauma             Boolean?   @default(false)
+  specLutto              Boolean?   @default(false)
+  specSessualita         Boolean?   @default(false)
+  specDisturbiAlimentari Boolean?   @default(false)
+  specDipendenze         Boolean?   @default(false)
+  specNeurodivergenze    Boolean?   @default(false)
+  answers            Answer[]
+  Conversation       Conversation[]
+  user               User           @relation(fields: [userId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  Review             Review[]
+  sentMessages       Message[]
+}
+
+model Question {
+  id           String         @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId       String         @db.Uuid
+  title        String         @db.VarChar(255)
+  content      String
+  isAnonymous  Boolean?       @default(false)
+  createdAt    DateTime?      @default(now()) @db.Timestamp(6)
+  answers      Answer[]
+  Conversation Conversation[]
+  user         User           @relation(fields: [userId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+}
+
+model Answer {
+  id             String         @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  questionId     String         @db.Uuid
+  psychologistId String         @db.Uuid
+  content        String
+  createdAt      DateTime?      @default(now()) @db.Timestamp(6)
+  psychologist   Psychologist   @relation(fields: [psychologistId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  question       Question       @relation(fields: [questionId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  Conversation   Conversation[]
+}
+
+model Conversation {
+  id              String       @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId          String       @db.Uuid
+  psychologistId  String       @db.Uuid
+  firstQuestionId String       @db.Uuid
+  firstAnswerId   String       @db.Uuid
+  createdAt       DateTime?    @default(now()) @db.Timestamp(6)
+  updatedAt       DateTime?    @default(now()) @db.Timestamp(6)
+  Answer          Answer       @relation(fields: [firstAnswerId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  Question        Question     @relation(fields: [firstQuestionId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  Psychologist    Psychologist @relation(fields: [psychologistId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  User            User         @relation(fields: [userId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  messages        Message[]
+}
+
+model Message {
+  id             String       @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  conversationId String       @db.Uuid
+  senderUserId   String?      @db.Uuid
+  senderPsychId  String?      @db.Uuid
+  content        String
+  createdAt      DateTime     @default(now()) @db.Timestamp(6)
+  conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  senderUser     User?        @relation(fields: [senderUserId], references: [id], onDelete: SetNull, onUpdate: NoAction)
+  senderPsych    Psychologist? @relation(fields: [senderPsychId], references: [id], onDelete: SetNull, onUpdate: NoAction)
+}
+
+model AppSettings {
+  id             String   @id @default("singleton")
+  radiusKm       Float    @default(50)
+  expandMinutes  Int      @default(60)
+  maxAnswers     Int      @default(5)
+  updatedAt      DateTime @default(now()) @updatedAt @db.Timestamp(6)
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model Review {
+  id             String       @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId         String       @db.Uuid
+  psychologistId String       @db.Uuid
+  rating         Int
+  comment        String?
+  createdAt      DateTime?    @default(now()) @db.Timestamp(6)
+  Psychologist   Psychologist @relation(fields: [psychologistId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  User           User         @relation(fields: [userId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+}
