@@ -1,4 +1,4 @@
-import { IsBoolean, IsEmail, IsIn, IsOptional, IsString, ValidateIf } from 'class-validator';
+import { IsArray, IsBoolean, IsEmail, IsIn, IsOptional, IsString, ValidateIf } from 'class-validator';
 
 export class RegisterDto {
   @IsEmail()
@@ -26,8 +26,17 @@ export class RegisterDto {
   bio?: string;
 
   @IsOptional()
-  @IsString()
-  address?: string;
+  @IsBoolean()
+  isOnlineOnly?: boolean;
+
+  @IsOptional()
+  @IsBoolean()
+  isPsychotherapist?: boolean;
+
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  addresses?: string[];
 
   @IsOptional()
   @IsString()

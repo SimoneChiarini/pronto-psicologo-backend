@@ -1,13 +1,21 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { Prisma, Answer } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
+import { FirebaseService } from '../firebase/firebase.service';
 
 @Injectable()
 export class AnswerService {
-  constructor(private prisma: PrismaService) {}
+  private readonly logger = new Logger(AnswerService.name);
 
-  create(data: Prisma.AnswerCreateInput | Prisma.AnswerUncheckedCreateInput): Promise<Answer> {
-    return this.prisma.answer.create({ data });
+  constructor(
+    private prisma: PrismaService,
+    private firebaseService: FirebaseService,
+  ) {}
+
+  async create(data: Prisma.AnswerCreateInput | Prisma.AnswerUncheckedCreateInput): Promise<Answer> {
+    const answer = await this.prisma.answer.create({ data });
+    this.notifyQuestionOwner(answer).catch((e) => this.logger.warn('Notifica risposta fallita: ' + e.message));
+    return answer;
   }
 
   findAll(): Promise<Answer[]> {
@@ -63,6 +71,32 @@ export class AnswerService {
 
   remove(id: string): Promise<Answer> {
     return this.prisma.answer.delete({ where: { id } });
+  }
+
+  private async notifyQuestionOwner(answer: Answer): Promise<void> {
+    const question = await this.prisma.question.findUnique({
+      where: { id: answer.questionId },
+      select: {
+        title: true,
+        user: { select: { fcmToken: true } },
+      },
+    });
+    const fcmToken = question?.user?.fcmToken;
+    if (!fcmToken) return;
+
+    const psych = await this.prisma.psychologist.findUnique({
+      where: { id: answer.psychologistId },
+      select: { user: { select: { firstName: true, lastName: true } } },
+    });
+    const psychName = psych?.user
+      ? `${psych.user.firstName ?? ''} ${psych.user.lastName ?? ''}`.trim()
+      : 'Uno psicologo';
+
+    await this.firebaseService.sendToToken(
+      fcmToken,
+      'Hai ricevuto una risposta!',
+      `${psychName} ha risposto alla tua domanda: "${question!.title}"`,
+    );
   }
 
   private haversineKm(lat1: number, lon1: number, lat2: number, lon2: number): number {

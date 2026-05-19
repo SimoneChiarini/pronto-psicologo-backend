@@ -3,6 +3,8 @@ dist/
 uploads/
 .env
 *.env
+.claude/
+flutter_app/
 flutter_app/.dart_tool/
 flutter_app/build/
 flutter_app/.flutter-plugins

@@ -35,6 +35,21 @@ export class AuthService {
     });
   }
 
+  async updateFcmToken(userId: string, fcmToken: string) {
+    return this.prisma.user.update({
+      where: { id: userId },
+      data: { fcmToken },
+    });
+  }
+
+  async getFcmToken(userId: string) {
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+      select: { fcmToken: true },
+    });
+    return { fcmToken: user?.fcmToken ?? null };
+  }
+
   async register(registerDto: RegisterDto) {
     console.log('Register attempt:', registerDto);
     try {
@@ -54,10 +69,11 @@ export class AuthService {
           userId: user.id,
           alboCode: registerDto.alboCode || user.id,
           bio: registerDto.bio,
-          address: registerDto.address,
           phone: registerDto.phone,
           profileImage: registerDto.profileImage,
           isMale: registerDto.isMale,
+          isOnlineOnly: registerDto.isOnlineOnly ?? false,
+          isPsychotherapist: registerDto.isPsychotherapist ?? false,
           specAnsia: registerDto.specAnsia,
           specUmore: registerDto.specUmore,
           specStress: registerDto.specStress,
@@ -74,18 +90,35 @@ export class AuthService {
           specNeurodivergenze: registerDto.specNeurodivergenze,
         };
 
-        // Geocodifica l'indirizzo al momento della registrazione
-        if (registerDto.address) {
-          const coords = await this.geocodeAddress(registerDto.address);
-          if (coords) {
-            psychData.latitude = coords.lat;
-            psychData.longitude = coords.lng;
-          }
+        const addresses = registerDto.addresses ?? [];
+
+        // Geocodifica tutti gli indirizzi; il primo imposta le coordinate primarie
+        const geocoded: { address: string; lat?: number; lng?: number }[] = [];
+        for (const addr of addresses) {
+          if (!addr.trim()) continue;
+          const coords = await this.geocodeAddress(addr.trim());
+          geocoded.push({ address: addr.trim(), lat: coords?.lat, lng: coords?.lng });
+        }
+
+        if (!registerDto.isOnlineOnly && geocoded.length > 0 && geocoded[0].lat != null) {
+          psychData.latitude = geocoded[0].lat;
+          psychData.longitude = geocoded[0].lng;
         }
 
         console.log('[Register] psychData before create:', JSON.stringify(psychData));
         const created = await this.prisma.psychologist.create({ data: psychData });
         console.log('[Register] psychologist created, lat:', created.latitude, 'lng:', created.longitude);
+
+        for (const ga of geocoded) {
+          await this.prisma.psychologistAddress.create({
+            data: {
+              psychologistId: created.id,
+              address: ga.address,
+              latitude: ga.lat,
+              longitude: ga.lng,
+            },
+          });
+        }
       }
 
       return this.login(user);

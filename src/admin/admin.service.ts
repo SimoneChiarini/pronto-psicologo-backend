@@ -88,7 +88,7 @@ export class AdminService {
   getAllAnswers() {
     return this.prisma.answer.findMany({
       include: {
-        psychologist: { select: { alboCode: true, bio: true, address: true, verified: true } },
+        psychologist: { select: { alboCode: true, bio: true, verified: true } },
         question: { select: { title: true, content: true } },
       },
       orderBy: { createdAt: 'desc' },

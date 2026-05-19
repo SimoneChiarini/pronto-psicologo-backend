@@ -34,4 +34,16 @@ export class AuthController {
   updateLocation(@Request() req, @Body() body: { latitude: number; longitude: number }) {
     return this.authService.updateLocation(req.user.userId, body.latitude, body.longitude);
   }
+
+  @UseGuards(JwtAuthGuard)
+  @Patch('fcm-token')
+  updateFcmToken(@Request() req, @Body() body: { fcmToken: string }) {
+    return this.authService.updateFcmToken(req.user.userId, body.fcmToken);
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Get('fcm-token')
+  getFcmToken(@Request() req) {
+    return this.authService.getFcmToken(req.user.userId);
+  }
 }

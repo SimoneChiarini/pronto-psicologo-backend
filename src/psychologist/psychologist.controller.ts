@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Put, Delete, Param, Body } from '@nestjs/common';
+import { Controller, Get, Post, Put, Delete, Param, Body, UseGuards, Request } from '@nestjs/common';
 import { PsychologistService } from './psychologist.service';
 import { CreatePsychologistDto } from './dto/create-psychologist.dto';
 import { UpdatePsychologistDto } from './dto/update-psychologist.dto';
@@ -6,6 +6,11 @@ import { UpdatePsychologistDto } from './dto/update-psychologist.dto';
 @Controller('psychologists')
 export class PsychologistController {
   constructor(private readonly psychologistService: PsychologistService) {}
+
+  @Post('ai-rank')
+  aiRank(@Body() body: { query: string }) {
+    return this.psychologistService.aiRank(body.query ?? '');
+  }
 
   @Post()
   create(@Body() data: CreatePsychologistDto) {

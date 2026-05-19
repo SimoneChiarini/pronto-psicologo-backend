@@ -1,4 +1,4 @@
-import { IsBoolean, IsOptional, IsString } from 'class-validator';
+import { IsArray, IsBoolean, IsOptional, IsString } from 'class-validator';
 
 export class UpdatePsychologistDto {
   @IsOptional()
@@ -23,7 +23,24 @@ export class UpdatePsychologistDto {
 
   @IsOptional()
   @IsString()
-  address?: string;
+  coverImage?: string;
+
+  @IsOptional()
+  @IsBoolean()
+  isOnlineOnly?: boolean;
+
+  @IsOptional()
+  @IsBoolean()
+  isPsychotherapist?: boolean;
+
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  addresses?: string[];
+
+  @IsOptional()
+  @IsString()
+  phone?: string;
 
   @IsOptional() @IsBoolean() isMale?: boolean;
   @IsOptional() @IsBoolean() specAnsia?: boolean;
