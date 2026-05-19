@@ -10,7 +10,7 @@ COPY tsconfig*.json nest-cli.json ./
 COPY prisma ./prisma
 COPY src ./src
 
-RUN npm run build
+RUN npx prisma generate && npm run build
 
 # ── Stage 2: production ──────────────────────────────────────
 FROM node:20-alpine AS runner
