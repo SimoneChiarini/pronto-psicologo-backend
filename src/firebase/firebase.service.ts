@@ -41,4 +41,13 @@ export class FirebaseService {
       this.logger.warn(`FCM multicast fallito: ${e.message}`);
     }
   }
+
+  async verifyIdToken(token: string): Promise<admin.auth.DecodedIdToken | null> {
+    if (!admin.apps.length) return null;
+    try {
+      return await admin.auth().verifyIdToken(token);
+    } catch {
+      return null;
+    }
+  }
 }

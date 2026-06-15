@@ -11,7 +11,14 @@ export class MessageService {
     senderUserId?: string;
     senderPsychId?: string;
   }) {
-    return this.prisma.message.create({ data });
+    const [message] = await this.prisma.$transaction([
+      this.prisma.message.create({ data }),
+      this.prisma.conversation.update({
+        where: { id: data.conversationId },
+        data: { updatedAt: new Date() },
+      }),
+    ]);
+    return message;
   }
 
   findByConversation(conversationId: string) {

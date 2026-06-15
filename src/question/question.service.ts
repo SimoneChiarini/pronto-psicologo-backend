@@ -23,11 +23,7 @@ export class QuestionService {
   }
 
   async findUnansweredForPsychologist(psychologistId: string, psychLat?: number, psychLng?: number) {
-    const settings = await this.prisma.appSettings.upsert({
-      where: { id: 'singleton' },
-      update: {},
-      create: { id: 'singleton' },
-    });
+    const settings = await this.prisma.appSettings.findFirst() ?? { radiusKm: 50, expandMinutes: 60, maxAnswers: 5 };
 
     const questions = await this.prisma.question.findMany({
       where: { answers: { none: { psychologistId } } },
@@ -77,11 +73,7 @@ export class QuestionService {
   }
 
   private async notifyNearbyPsychologists(question: Question): Promise<void> {
-    const settings = await this.prisma.appSettings.upsert({
-      where: { id: 'singleton' },
-      update: {},
-      create: { id: 'singleton' },
-    });
+    const settings = await this.prisma.appSettings.findFirst() ?? { radiusKm: 50, expandMinutes: 60, maxAnswers: 5 };
 
     const questionUser = await this.prisma.user.findUnique({
       where: { id: question.userId },

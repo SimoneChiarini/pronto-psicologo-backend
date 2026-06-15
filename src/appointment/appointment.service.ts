@@ -46,6 +46,10 @@ export class AppointmentService {
     });
   }
 
+  findById(id: string) {
+    return this.prisma.appointment.findUnique({ where: { id } });
+  }
+
   acceptSlot(id: string) {
     return this.prisma.appointment.update({ where: { id }, data: { status: 'CONFIRMED' } });
   }

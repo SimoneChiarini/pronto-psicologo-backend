@@ -13,6 +13,7 @@ async function main() {
   await prisma.conversation.deleteMany();
   await prisma.answer.deleteMany();
   await prisma.question.deleteMany();
+  await prisma.post.deleteMany();
 
   console.log('✅ Dati derivati puliti');
 
@@ -242,6 +243,17 @@ async function main() {
       startTime: day(3, 15, 0), endTime: day(3, 16, 0),
       isExternal: false, status: 'CONFIRMED',
     },
+  ]});
+
+  // ── POST PSICOLOGI ────────────────────────────────────────────
+  await prisma.post.createMany({ data: [
+    { psychologistId: pVerdi.id,   content: 'L\'ansia non è un nemico da sconfiggere, ma un segnale da ascoltare. Spesso ci avvisa che qualcosa nella nostra vita merita attenzione. Imparare a distinguere ansia utile da ansia disfunzionale è il primo passo verso il benessere.' },
+    { psychologistId: pVerdi.id,   content: 'Piccolo promemoria: il confronto con gli altri sui social mostra sempre il loro momento migliore, non la realtà quotidiana. Proteggere la propria autostima significa anche sapere quando disconnettersi.' },
+    { psychologistId: pMarino.id,  content: 'La rabbia è un\'emozione secondaria: quasi sempre sotto c\'è paura, tristezza o un bisogno inascoltato. Invece di chiedersi "come faccio a non arrabbiarmi", proviamo a chiederci "cosa ho paura di perdere?".' },
+    { psychologistId: pMarino.id,  content: 'Nelle relazioni di coppia, litigare non è il problema. Il problema è come si litiga. La comunicazione assertiva — esprimere i propri bisogni senza attaccare l\'altro — si impara, non è innata.' },
+    { psychologistId: pCosta.id,   content: 'Adolescenza: un periodo di costruzione dell\'identità in cui i ragazzi hanno bisogno di sentirsi capiti, non giudicati. Per i genitori, la cosa più difficile e più preziosa è saper ascoltare senza dare subito risposte.' },
+    { psychologistId: pFontana.id, content: 'Procrastinare non significa essere pigri. Spesso significa avere paura: del fallimento, del giudizio, della perfezione. Riconoscere questa paura è già metà del lavoro.' },
+    { psychologistId: pPratesi.id, content: 'Ogni volta che prendiamo il telefono senza uno scopo preciso, stiamo cercando qualcosa: distrazione, connessione, stimolo. Capire cosa cerchiamo davvero è il punto di partenza per un rapporto più sano con la tecnologia.' },
   ]});
 
   console.log('✅ Seed completato!');

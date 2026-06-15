@@ -10,12 +10,17 @@ export class UserService {
     return this.prisma.user.create({ data });
   }
 
-  findAll(): Promise<User[]> {
-    return this.prisma.user.findMany();
+  findAll() {
+    return this.prisma.user.findMany({
+      select: { id: true, email: true, role: true, firstName: true, lastName: true, profileImage: true, createdAt: true },
+    });
   }
 
-  findOne(id: string): Promise<User | null> {
-    return this.prisma.user.findUnique({ where: { id } });
+  findOne(id: string) {
+    return this.prisma.user.findUnique({
+      where: { id },
+      select: { id: true, email: true, role: true, firstName: true, lastName: true, profileImage: true, createdAt: true },
+    });
   }
 
   update(id: string, data: Prisma.UserUpdateInput): Promise<User> {

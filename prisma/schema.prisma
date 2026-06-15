@@ -18,8 +18,13 @@ model User {
   profileImage String?        @db.VarChar(500)
   latitude     Float?
   longitude    Float?
-  fcmToken     String?        @db.VarChar(500)
-  createdAt    DateTime?      @default(now()) @db.Timestamp(6)
+  fcmToken                 String?        @db.VarChar(500)
+  phone                    String?        @db.VarChar(20)
+  phoneVerified            Boolean        @default(false)
+  emailVerified            Boolean        @default(false)
+  emailVerificationToken   String?        @db.VarChar(200)
+  emailVerificationExpires DateTime?
+  createdAt                DateTime?      @default(now()) @db.Timestamp(6)
   Conversation  Conversation[]
   psychologist  Psychologist?
   questions     Question[]
@@ -44,20 +49,6 @@ model Psychologist {
   isPsychotherapist  Boolean?       @default(false)
   createdAt          DateTime?      @default(now()) @db.Timestamp(6)
   isMale             Boolean?
-  specAnsia              Boolean?   @default(false)
-  specUmore              Boolean?   @default(false)
-  specStress             Boolean?   @default(false)
-  specRelazioni          Boolean?   @default(false)
-  specCoppia             Boolean?   @default(false)
-  specGenitorialita      Boolean?   @default(false)
-  specInfanzia           Boolean?   @default(false)
-  specAutostima          Boolean?   @default(false)
-  specTrauma             Boolean?   @default(false)
-  specLutto              Boolean?   @default(false)
-  specSessualita         Boolean?   @default(false)
-  specDisturbiAlimentari Boolean?   @default(false)
-  specDipendenze         Boolean?   @default(false)
-  specNeurodivergenze    Boolean?   @default(false)
   coverImage         String?        @db.VarChar(500)
   answers            Answer[]
   Conversation       Conversation[]
@@ -67,6 +58,15 @@ model Psychologist {
   appointments       Appointment[]
   posts              Post[]
   addresses          PsychologistAddress[]
+  specializations    PsychologistSpecialization[]
+}
+
+model PsychologistSpecialization {
+  psychologistId String       @db.Uuid
+  tagCode        String       @db.VarChar(100)
+  psychologist   Psychologist @relation(fields: [psychologistId], references: [id], onDelete: Cascade)
+  @@id([psychologistId, tagCode])
+  @@index([tagCode])
 }
 
 model PsychologistAddress {

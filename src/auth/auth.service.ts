@@ -1,15 +1,20 @@
 import * as https from 'https';
-import { Injectable } from '@nestjs/common';
+import * as crypto from 'crypto';
+import { BadRequestException, Injectable, UnauthorizedException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { JwtService } from '@nestjs/jwt';
 import * as bcrypt from 'bcryptjs';
 import { RegisterDto } from './dto/register.dto';
+import { EmailService } from '../email/email.service';
+import { FirebaseService } from '../firebase/firebase.service';
 
 @Injectable()
 export class AuthService {
   constructor(
     private prisma: PrismaService,
     private jwtService: JwtService,
+    private emailService: EmailService,
+    private firebaseService: FirebaseService,
   ) {}
 
   async validateUser(email: string, password: string): Promise<any> {
@@ -50,10 +55,42 @@ export class AuthService {
     return { fcmToken: user?.fcmToken ?? null };
   }
 
+  async verifyEmail(token: string): Promise<void> {
+    const user = await this.prisma.user.findFirst({
+      where: {
+        emailVerificationToken: token,
+        emailVerificationExpires: { gt: new Date() },
+      },
+    });
+    if (!user) throw new BadRequestException('Token non valido o scaduto');
+    await this.prisma.user.update({
+      where: { id: user.id },
+      data: {
+        emailVerified: true,
+        emailVerificationToken: null,
+        emailVerificationExpires: null,
+      },
+    });
+  }
+
+  async verifyPhone(userId: string, firebaseToken: string): Promise<{ message: string }> {
+    const decoded = await this.firebaseService.verifyIdToken(firebaseToken);
+    if (!decoded || !decoded.phone_number) {
+      throw new UnauthorizedException('Token Firebase non valido');
+    }
+    await this.prisma.user.update({
+      where: { id: userId },
+      data: { phone: decoded.phone_number, phoneVerified: true },
+    });
+    return { message: 'Telefono verificato' };
+  }
+
   async register(registerDto: RegisterDto) {
-    console.log('Register attempt:', registerDto);
     try {
       const hashedPassword = await bcrypt.hash(registerDto.password, 10);
+      const emailVerificationToken = crypto.randomBytes(32).toString('hex');
+      const emailVerificationExpires = new Date(Date.now() + 24 * 60 * 60 * 1000);
+
       const user = await this.prisma.user.create({
         data: {
           email: registerDto.email,
@@ -61,38 +98,29 @@ export class AuthService {
           role: registerDto.role,
           firstName: registerDto.firstName,
           lastName: registerDto.lastName,
+          phone: registerDto.phone ?? null,
+          emailVerificationToken,
+          emailVerificationExpires,
         },
       });
+
+      this.emailService
+        .sendVerificationEmail(user.email, emailVerificationToken)
+        .catch(() => {});
 
       if (registerDto.role === 'PSYCHOLOGIST') {
         const psychData: any = {
           userId: user.id,
-          alboCode: registerDto.alboCode || user.id,
+          alboCode: registerDto.alboCode!,
           bio: registerDto.bio,
           phone: registerDto.phone,
           profileImage: registerDto.profileImage,
           isMale: registerDto.isMale,
           isOnlineOnly: registerDto.isOnlineOnly ?? false,
           isPsychotherapist: registerDto.isPsychotherapist ?? false,
-          specAnsia: registerDto.specAnsia,
-          specUmore: registerDto.specUmore,
-          specStress: registerDto.specStress,
-          specRelazioni: registerDto.specRelazioni,
-          specCoppia: registerDto.specCoppia,
-          specGenitorialita: registerDto.specGenitorialita,
-          specInfanzia: registerDto.specInfanzia,
-          specAutostima: registerDto.specAutostima,
-          specTrauma: registerDto.specTrauma,
-          specLutto: registerDto.specLutto,
-          specSessualita: registerDto.specSessualita,
-          specDisturbiAlimentari: registerDto.specDisturbiAlimentari,
-          specDipendenze: registerDto.specDipendenze,
-          specNeurodivergenze: registerDto.specNeurodivergenze,
         };
 
         const addresses = registerDto.addresses ?? [];
-
-        // Geocodifica tutti gli indirizzi; il primo imposta le coordinate primarie
         const geocoded: { address: string; lat?: number; lng?: number }[] = [];
         for (const addr of addresses) {
           if (!addr.trim()) continue;
@@ -105,25 +133,24 @@ export class AuthService {
           psychData.longitude = geocoded[0].lng;
         }
 
-        console.log('[Register] psychData before create:', JSON.stringify(psychData));
         const created = await this.prisma.psychologist.create({ data: psychData });
-        console.log('[Register] psychologist created, lat:', created.latitude, 'lng:', created.longitude);
 
         for (const ga of geocoded) {
           await this.prisma.psychologistAddress.create({
-            data: {
-              psychologistId: created.id,
-              address: ga.address,
-              latitude: ga.lat,
-              longitude: ga.lng,
-            },
+            data: { psychologistId: created.id, address: ga.address, latitude: ga.lat, longitude: ga.lng },
+          });
+        }
+
+        if (registerDto.tagCodes && registerDto.tagCodes.length > 0) {
+          await this.prisma.psychologistSpecialization.createMany({
+            data: registerDto.tagCodes.map(code => ({ psychologistId: created.id, tagCode: code })),
+            skipDuplicates: true,
           });
         }
       }
 
       return this.login(user);
     } catch (error) {
-      console.error('Registration error:', error);
       throw error;
     }
   }
@@ -136,26 +163,18 @@ export class AuthService {
         headers: { 'User-Agent': 'ProntoPsicologo/1.0 (simo.chiaro1997prato@gmail.com)' },
       };
       https.get(options, (res) => {
-        console.log('[Geocoding] status:', res.statusCode, 'address:', address);
         let raw = '';
         res.on('data', (chunk: string) => { raw += chunk; });
         res.on('end', () => {
-          console.log('[Geocoding] response:', raw.substring(0, 300));
           try {
             const json = JSON.parse(raw) as Array<{ lat: string; lon: string }>;
-            if (!json.length) { console.log('[Geocoding] no results'); return resolve(null); }
-            const coords = { lat: parseFloat(json[0].lat), lng: parseFloat(json[0].lon) };
-            console.log('[Geocoding] success:', coords);
-            resolve(coords);
-          } catch (e) {
-            console.log('[Geocoding] parse error:', e);
+            if (!json.length) return resolve(null);
+            resolve({ lat: parseFloat(json[0].lat), lng: parseFloat(json[0].lon) });
+          } catch {
             resolve(null);
           }
         });
-      }).on('error', (e) => {
-        console.log('[Geocoding] network error:', e.message);
-        resolve(null);
-      });
+      }).on('error', () => resolve(null));
     });
   }
 }

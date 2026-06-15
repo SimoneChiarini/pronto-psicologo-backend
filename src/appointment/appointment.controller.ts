@@ -38,6 +38,10 @@ export class AppointmentController {
   @Patch(':id/accept')
   async acceptSlot(@Param('id') id: string, @Request() req) {
     if (req.user.role !== 'PSYCHOLOGIST') throw new ForbiddenException();
+    const psych = await this.psychologistService.findByUserId(req.user.userId);
+    if (!psych) throw new UnauthorizedException('Profilo psicologo non trovato');
+    const appt = await this.appointmentService.findById(id);
+    if (!appt || appt.psychologistId !== psych.id) throw new ForbiddenException();
     return this.appointmentService.acceptSlot(id);
   }
 
@@ -46,6 +50,10 @@ export class AppointmentController {
   @Patch(':id/reject')
   async rejectSlot(@Param('id') id: string, @Request() req) {
     if (req.user.role !== 'PSYCHOLOGIST') throw new ForbiddenException();
+    const psych = await this.psychologistService.findByUserId(req.user.userId);
+    if (!psych) throw new UnauthorizedException('Profilo psicologo non trovato');
+    const appt = await this.appointmentService.findById(id);
+    if (!appt || appt.psychologistId !== psych.id) throw new ForbiddenException();
     return this.appointmentService.rejectSlot(id);
   }
 
@@ -82,6 +90,10 @@ export class AppointmentController {
   @Patch(':id')
   async update(@Param('id') id: string, @Body() dto: UpdateAppointmentDto, @Request() req) {
     if (req.user.role !== 'PSYCHOLOGIST') throw new ForbiddenException();
+    const psych = await this.psychologistService.findByUserId(req.user.userId);
+    if (!psych) throw new UnauthorizedException('Profilo psicologo non trovato');
+    const appt = await this.appointmentService.findById(id);
+    if (!appt || appt.psychologistId !== psych.id) throw new ForbiddenException();
     return this.appointmentService.update(id, dto);
   }
 
@@ -89,6 +101,10 @@ export class AppointmentController {
   @Delete(':id')
   async remove(@Param('id') id: string, @Request() req) {
     if (req.user.role !== 'PSYCHOLOGIST') throw new ForbiddenException();
+    const psych = await this.psychologistService.findByUserId(req.user.userId);
+    if (!psych) throw new UnauthorizedException('Profilo psicologo non trovato');
+    const appt = await this.appointmentService.findById(id);
+    if (!appt || appt.psychologistId !== psych.id) throw new ForbiddenException();
     return this.appointmentService.remove(id);
   }
 }

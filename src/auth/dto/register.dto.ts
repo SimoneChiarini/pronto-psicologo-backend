@@ -1,4 +1,4 @@
-import { IsArray, IsBoolean, IsEmail, IsIn, IsOptional, IsString, ValidateIf } from 'class-validator';
+import { IsArray, IsBoolean, IsEmail, IsIn, IsNotEmpty, IsOptional, IsString, ValidateIf } from 'class-validator';
 
 export class RegisterDto {
   @IsEmail()
@@ -19,6 +19,7 @@ export class RegisterDto {
 
   @ValidateIf((obj) => obj.role === 'PSYCHOLOGIST')
   @IsString()
+  @IsNotEmpty()
   alboCode?: string;
 
   @IsOptional()
@@ -47,21 +48,10 @@ export class RegisterDto {
   phone?: string;
 
   @IsOptional()
-  @IsBoolean()
   isMale?: boolean;
 
-  @IsOptional() @IsBoolean() specAnsia?: boolean;
-  @IsOptional() @IsBoolean() specUmore?: boolean;
-  @IsOptional() @IsBoolean() specStress?: boolean;
-  @IsOptional() @IsBoolean() specRelazioni?: boolean;
-  @IsOptional() @IsBoolean() specCoppia?: boolean;
-  @IsOptional() @IsBoolean() specGenitorialita?: boolean;
-  @IsOptional() @IsBoolean() specInfanzia?: boolean;
-  @IsOptional() @IsBoolean() specAutostima?: boolean;
-  @IsOptional() @IsBoolean() specTrauma?: boolean;
-  @IsOptional() @IsBoolean() specLutto?: boolean;
-  @IsOptional() @IsBoolean() specSessualita?: boolean;
-  @IsOptional() @IsBoolean() specDisturbiAlimentari?: boolean;
-  @IsOptional() @IsBoolean() specDipendenze?: boolean;
-  @IsOptional() @IsBoolean() specNeurodivergenze?: boolean;
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  tagCodes?: string[];
 }
