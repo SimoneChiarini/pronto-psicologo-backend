@@ -85,6 +85,14 @@ export class AdminService {
     });
   }
 
+  setPsychologistVerified(id: string, verified: boolean) {
+    return this.prisma.psychologist.update({
+      where: { id },
+      data: { verified },
+      select: { id: true, verified: true },
+    });
+  }
+
   getAllAnswers() {
     return this.prisma.answer.findMany({
       include: {

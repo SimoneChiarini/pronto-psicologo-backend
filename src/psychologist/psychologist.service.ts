@@ -29,7 +29,9 @@ export class PsychologistService {
   };
 
   async findAll() {
+    // Visibili agli utenti solo i profili verificati (albo) e con abbonamento attivo.
     const psychologists = await this.prisma.psychologist.findMany({
+      where: { verified: true, subscriptionActive: true },
       include: this.PSYCH_INCLUDE,
     });
     return psychologists.map(p => this.withRating(p));

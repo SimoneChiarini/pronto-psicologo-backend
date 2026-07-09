@@ -29,7 +29,14 @@ export class AuthController {
   @UseGuards(JwtAuthGuard)
   @Get('profile')
   getProfile(@Request() req) {
-    return req.user;
+    return this.authService.getProfile(req.user.userId);
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Throttle({ default: { ttl: 60000, limit: 3 } })
+  @Post('resend-verification-email')
+  resendVerificationEmail(@Request() req) {
+    return this.authService.resendVerificationEmail(req.user.userId);
   }
 
   @UseGuards(JwtAuthGuard)

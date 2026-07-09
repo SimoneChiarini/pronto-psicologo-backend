@@ -6,7 +6,8 @@ import { join } from 'path';
 import { AppModule } from './app.module';
 
 async function bootstrap() {
-  const app = await NestFactory.create<NestExpressApplication>(AppModule);
+  // rawBody: true conserva il body grezzo (necessario per verificare la firma dei webhook Stripe)
+  const app = await NestFactory.create<NestExpressApplication>(AppModule, { rawBody: true });
   app.enableCors({
     origin: '*',
     methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],

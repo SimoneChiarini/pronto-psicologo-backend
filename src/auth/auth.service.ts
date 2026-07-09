@@ -4,7 +4,7 @@ import { BadRequestException, Injectable, UnauthorizedException } from '@nestjs/
 import { PrismaService } from '../prisma/prisma.service';
 import { JwtService } from '@nestjs/jwt';
 import * as bcrypt from 'bcryptjs';
-import { RegisterDto } from './dto/register.dto';
+import { RegisterDto, CONTRACT_VERSION } from './dto/register.dto';
 import { EmailService } from '../email/email.service';
 import { FirebaseService } from '../firebase/firebase.service';
 
@@ -55,6 +55,41 @@ export class AuthService {
     return { fcmToken: user?.fcmToken ?? null };
   }
 
+  async getProfile(userId: string) {
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+      select: {
+        id: true,
+        email: true,
+        role: true,
+        firstName: true,
+        lastName: true,
+        profileImage: true,
+        phone: true,
+        emailVerified: true,
+        phoneVerified: true,
+      },
+    });
+    if (!user) throw new UnauthorizedException('Utente non trovato');
+    const { id, ...rest } = user;
+    return { userId: id, ...rest };
+  }
+
+  async resendVerificationEmail(userId: string): Promise<{ message: string }> {
+    const user = await this.prisma.user.findUnique({ where: { id: userId } });
+    if (!user) throw new BadRequestException('Utente non trovato');
+    if (user.emailVerified) return { message: 'Email già verificata' };
+
+    const emailVerificationToken = crypto.randomBytes(32).toString('hex');
+    const emailVerificationExpires = new Date(Date.now() + 24 * 60 * 60 * 1000);
+    await this.prisma.user.update({
+      where: { id: userId },
+      data: { emailVerificationToken, emailVerificationExpires },
+    });
+    await this.emailService.sendVerificationEmail(user.email, emailVerificationToken);
+    return { message: 'Email di verifica inviata' };
+  }
+
   async verifyEmail(token: string): Promise<void> {
     const user = await this.prisma.user.findFirst({
       where: {
@@ -87,6 +122,10 @@ export class AuthService {
 
   async register(registerDto: RegisterDto) {
     try {
+      if (registerDto.role === 'PSYCHOLOGIST' && !registerDto.contractAccepted) {
+        throw new BadRequestException('Devi accettare il contratto di abbonamento per registrarti come psicologo');
+      }
+
       const hashedPassword = await bcrypt.hash(registerDto.password, 10);
       const emailVerificationToken = crypto.randomBytes(32).toString('hex');
       const emailVerificationExpires = new Date(Date.now() + 24 * 60 * 60 * 1000);
@@ -118,6 +157,12 @@ export class AuthService {
           isMale: registerDto.isMale,
           isOnlineOnly: registerDto.isOnlineOnly ?? false,
           isPsychotherapist: registerDto.isPsychotherapist ?? false,
+          // Abbonamento: il piano scelto viene salvato subito; l'incasso e
+          // l'attivazione (subscriptionActive) avvengono dopo la verifica albo.
+          subscriptionPlan: registerDto.subscriptionPlan ?? null,
+          subscriptionActive: false,
+          contractVersion: CONTRACT_VERSION,
+          contractAcceptedAt: new Date(),
         };
 
         const addresses = registerDto.addresses ?? [];

@@ -19,6 +19,7 @@ import { AppointmentModule } from './appointment/appointment.module';
 import { PostModule } from './post/post.module';
 import { SpecializationModule } from './specialization/specialization.module';
 import { EmailModule } from './email/email.module';
+import { BillingModule } from './billing/billing.module';
 
 @Module({
   imports: [
@@ -39,6 +40,7 @@ import { EmailModule } from './email/email.module';
     AppointmentModule,
     PostModule,
     SpecializationModule,
+    BillingModule,
   ],
   controllers: [AppController],
   providers: [

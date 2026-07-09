@@ -1,5 +1,8 @@
 import { IsArray, IsBoolean, IsEmail, IsIn, IsNotEmpty, IsOptional, IsString, ValidateIf } from 'class-validator';
 
+export const CONTRACT_VERSION = 'v1';
+export const SUBSCRIPTION_PLANS = ['MONTHLY', 'ANNUAL'] as const;
+
 export class RegisterDto {
   @IsEmail()
   email: string;
@@ -54,4 +57,13 @@ export class RegisterDto {
   @IsArray()
   @IsString({ each: true })
   tagCodes?: string[];
+
+  @ValidateIf((obj) => obj.role === 'PSYCHOLOGIST')
+  @IsString()
+  @IsIn(SUBSCRIPTION_PLANS as unknown as string[])
+  subscriptionPlan?: string;
+
+  @ValidateIf((obj) => obj.role === 'PSYCHOLOGIST')
+  @IsBoolean()
+  contractAccepted?: boolean;
 }

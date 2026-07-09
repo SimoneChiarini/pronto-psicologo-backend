@@ -53,6 +53,12 @@ export class AdminController {
     return this.adminService.getAllPsychologists();
   }
 
+  @Patch('psychologists/:id/verify')
+  setPsychologistVerified(@Request() req, @Param('id') id: string, @Body() body: { verified: boolean }) {
+    this.checkAdmin(req);
+    return this.adminService.setPsychologistVerified(id, body.verified === true);
+  }
+
   @Get('answers')
   getAllAnswers(@Request() req) {
     this.checkAdmin(req);
