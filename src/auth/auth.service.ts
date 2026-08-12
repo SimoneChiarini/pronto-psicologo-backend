@@ -18,7 +18,8 @@ export class AuthService {
   ) {}
 
   async validateUser(email: string, password: string): Promise<any> {
-    const user = await this.prisma.user.findUnique({ where: { email } });
+    // Email case-insensitive: normalizziamo prima della ricerca
+    const user = await this.prisma.user.findUnique({ where: { email: email.trim().toLowerCase() } });
     if (user && (await bcrypt.compare(password, user.password))) {
       const { password, ...result } = user;
       return result;
@@ -145,7 +146,8 @@ export class AuthService {
     const user = await this.prisma.$transaction(async (tx) => {
       const user = await tx.user.create({
         data: {
-          email: registerDto.email,
+          // Salviamo l'email normalizzata (lowercase) per coerenza con il login
+          email: registerDto.email.trim().toLowerCase(),
           password: hashedPassword,
           role: registerDto.role,
           firstName: registerDto.firstName,
