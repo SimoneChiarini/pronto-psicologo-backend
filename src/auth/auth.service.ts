@@ -7,6 +7,7 @@ import * as bcrypt from 'bcryptjs';
 import { RegisterDto, CONTRACT_VERSION } from './dto/register.dto';
 import { EmailService } from '../email/email.service';
 import { FirebaseService } from '../firebase/firebase.service';
+import { AlboVerificationService } from '../albo/albo-verification.service';
 
 @Injectable()
 export class AuthService {
@@ -15,6 +16,7 @@ export class AuthService {
     private jwtService: JwtService,
     private emailService: EmailService,
     private firebaseService: FirebaseService,
+    private alboVerification: AlboVerificationService,
   ) {}
 
   async validateUser(email: string, password: string): Promise<any> {
@@ -141,6 +143,13 @@ export class AuthService {
       }
     }
 
+    // Verifica automatica iscrizione Albo (best-effort, fuori dalla transazione).
+    // Match netto → verified=true automatico; altrimenti resta alla verifica manuale admin.
+    const albo =
+      registerDto.role === 'PSYCHOLOGIST'
+        ? await this.alboVerification.verify(registerDto.firstName, registerDto.lastName)
+        : null;
+
     // Tutte le scritture DB in un'unica transazione: se qualcosa fallisce a metà
     // (es. alboCode duplicato) non resta un utente orfano.
     const user = await this.prisma.$transaction(async (tx) => {
@@ -174,6 +183,14 @@ export class AuthService {
           subscriptionActive: false,
           contractVersion: CONTRACT_VERSION,
           contractAcceptedAt: new Date(),
+          // Esito verifica Albo: match netto → verificato in automatico,
+          // gli altri casi (ambiguo/non trovato/errore) restano da verificare a mano.
+          alboVerified: albo?.result === 'MATCH',
+          alboVerifiedAt: albo?.result === 'MATCH' ? new Date() : null,
+          alboOrdine: albo?.ordine ?? null,
+          alboSezione: albo?.sezione ?? null,
+          alboCheckResult: albo?.result ?? null,
+          verified: albo?.result === 'MATCH',
         };
 
         if (!registerDto.isOnlineOnly && geocoded.length > 0 && geocoded[0].lat != null) {
