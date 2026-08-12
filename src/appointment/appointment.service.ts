@@ -74,7 +74,8 @@ export class AppointmentService {
         startTime: { gte: start, lt: end },
         status: { not: 'REJECTED' },
       },
-      select: { id: true, startTime: true, endTime: true, status: true, userId: true },
+      // Endpoint pubblico: esponiamo solo disponibilità/stato, non chi ha prenotato (userId)
+      select: { id: true, startTime: true, endTime: true, status: true },
       orderBy: { startTime: 'asc' },
     });
   }
