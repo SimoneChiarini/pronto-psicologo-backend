@@ -121,16 +121,29 @@ export class AuthService {
   }
 
   async register(registerDto: RegisterDto) {
-    try {
-      if (registerDto.role === 'PSYCHOLOGIST' && !registerDto.contractAccepted) {
-        throw new BadRequestException('Devi accettare il contratto di abbonamento per registrarti come psicologo');
+    if (registerDto.role === 'PSYCHOLOGIST' && !registerDto.contractAccepted) {
+      throw new BadRequestException('Devi accettare il contratto di abbonamento per registrarti come psicologo');
+    }
+
+    const hashedPassword = await bcrypt.hash(registerDto.password, 10);
+    const emailVerificationToken = crypto.randomBytes(32).toString('hex');
+    const emailVerificationExpires = new Date(Date.now() + 24 * 60 * 60 * 1000);
+
+    // Il geocoding fa chiamate HTTP esterne lente: lo eseguiamo PRIMA della
+    // transazione, per non tenere aperta una transazione DB durante l'I/O di rete.
+    const geocoded: { address: string; lat?: number; lng?: number }[] = [];
+    if (registerDto.role === 'PSYCHOLOGIST') {
+      for (const addr of registerDto.addresses ?? []) {
+        if (!addr.trim()) continue;
+        const coords = await this.geocodeAddress(addr.trim());
+        geocoded.push({ address: addr.trim(), lat: coords?.lat, lng: coords?.lng });
       }
+    }
 
-      const hashedPassword = await bcrypt.hash(registerDto.password, 10);
-      const emailVerificationToken = crypto.randomBytes(32).toString('hex');
-      const emailVerificationExpires = new Date(Date.now() + 24 * 60 * 60 * 1000);
-
-      const user = await this.prisma.user.create({
+    // Tutte le scritture DB in un'unica transazione: se qualcosa fallisce a metà
+    // (es. alboCode duplicato) non resta un utente orfano.
+    const user = await this.prisma.$transaction(async (tx) => {
+      const user = await tx.user.create({
         data: {
           email: registerDto.email,
           password: hashedPassword,
@@ -142,10 +155,6 @@ export class AuthService {
           emailVerificationExpires,
         },
       });
-
-      this.emailService
-        .sendVerificationEmail(user.email, emailVerificationToken)
-        .catch(() => {});
 
       if (registerDto.role === 'PSYCHOLOGIST') {
         const psychData: any = {
@@ -165,39 +174,41 @@ export class AuthService {
           contractAcceptedAt: new Date(),
         };
 
-        const addresses = registerDto.addresses ?? [];
-        const geocoded: { address: string; lat?: number; lng?: number }[] = [];
-        for (const addr of addresses) {
-          if (!addr.trim()) continue;
-          const coords = await this.geocodeAddress(addr.trim());
-          geocoded.push({ address: addr.trim(), lat: coords?.lat, lng: coords?.lng });
-        }
-
         if (!registerDto.isOnlineOnly && geocoded.length > 0 && geocoded[0].lat != null) {
           psychData.latitude = geocoded[0].lat;
           psychData.longitude = geocoded[0].lng;
         }
 
-        const created = await this.prisma.psychologist.create({ data: psychData });
+        const created = await tx.psychologist.create({ data: psychData });
 
-        for (const ga of geocoded) {
-          await this.prisma.psychologistAddress.create({
-            data: { psychologistId: created.id, address: ga.address, latitude: ga.lat, longitude: ga.lng },
+        if (geocoded.length > 0) {
+          await tx.psychologistAddress.createMany({
+            data: geocoded.map(ga => ({
+              psychologistId: created.id,
+              address: ga.address,
+              latitude: ga.lat,
+              longitude: ga.lng,
+            })),
           });
         }
 
         if (registerDto.tagCodes && registerDto.tagCodes.length > 0) {
-          await this.prisma.psychologistSpecialization.createMany({
+          await tx.psychologistSpecialization.createMany({
             data: registerDto.tagCodes.map(code => ({ psychologistId: created.id, tagCode: code })),
             skipDuplicates: true,
           });
         }
       }
 
-      return this.login(user);
-    } catch (error) {
-      throw error;
-    }
+      return user;
+    });
+
+    // Email di verifica solo dopo il commit (fire-and-forget)
+    this.emailService
+      .sendVerificationEmail(user.email, emailVerificationToken)
+      .catch(() => {});
+
+    return this.login(user);
   }
 
   private geocodeAddress(address: string): Promise<{ lat: number; lng: number } | null> {
