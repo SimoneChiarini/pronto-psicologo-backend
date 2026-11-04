@@ -1,7 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { S3Client, PutObjectCommand } from '@aws-sdk/client-s3';
+import { S3Client, PutObjectCommand, DeleteObjectCommand } from '@aws-sdk/client-s3';
 import { promises as fs } from 'fs';
-import { join } from 'path';
+import { basename, join } from 'path';
 
 /**
  * Astrae lo storage dei file caricati.
@@ -63,5 +63,24 @@ export class StorageService {
     await fs.mkdir(dir, { recursive: true });
     await fs.writeFile(join(dir, filename), buffer);
     return `/uploads/${filename}`;
+  }
+
+  /**
+   * Elimina un file dato l'URL restituito da saveImage. Best-effort: gli URL
+   * che non appartengono al nostro storage vengono ignorati, gli errori loggati.
+   */
+  async deleteByUrl(url: string | null | undefined): Promise<void> {
+    if (!url) return;
+    try {
+      if (this.usesRemote && url.startsWith(this.publicUrl + '/')) {
+        const key = decodeURIComponent(url.slice(this.publicUrl!.length + 1));
+        await this.client!.send(new DeleteObjectCommand({ Bucket: this.bucket!, Key: key }));
+        return;
+      }
+      const m = url.match(/\/uploads\/([^/?#]+)$/);
+      if (m) await fs.unlink(join(process.cwd(), 'uploads', basename(m[1]))).catch(() => {});
+    } catch (e: any) {
+      this.logger.warn(`Eliminazione file non riuscita (${url}): ${e.message}`);
+    }
   }
 }

@@ -230,8 +230,11 @@ model Review {
 // Il segnalato è sempre l'altra parte (ricavato dal backend, mai dal client).
 model Report {
   id             String        @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  reporterUserId String        @db.Uuid
-  reportedUserId String        @db.Uuid
+  // Nullable + SetNull: la segnalazione sopravvive alla cancellazione dell'account
+  // (altrimenti chi viene segnalato potrebbe cancellarsi per far sparire le tracce)
+  reporterUserId String?       @db.Uuid
+  reportedUserId String?       @db.Uuid
+  reportedLabel  String?       @db.VarChar(255) // "Nome Cognome (ruolo)" al momento della segnalazione
   conversationId String?       @db.Uuid
   reason         String        @db.VarChar(40)
   details        String?
@@ -239,8 +242,8 @@ model Report {
   adminNote      String?
   createdAt      DateTime      @default(now()) @db.Timestamp(6)
   resolvedAt     DateTime?     @db.Timestamp(6)
-  reporter       User          @relation("ReportReporter", fields: [reporterUserId], references: [id], onDelete: Cascade)
-  reported       User          @relation("ReportReported", fields: [reportedUserId], references: [id], onDelete: Cascade)
+  reporter       User?         @relation("ReportReporter", fields: [reporterUserId], references: [id], onDelete: SetNull)
+  reported       User?         @relation("ReportReported", fields: [reportedUserId], references: [id], onDelete: SetNull)
   conversation   Conversation? @relation(fields: [conversationId], references: [id], onDelete: SetNull)
 
   @@index([status])

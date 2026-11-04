@@ -86,6 +86,41 @@ export class EmailService {
     }
   }
 
+  async sendAccountDeletedEmail(to: string, firstName: string | null): Promise<void> {
+    if (!this.resend) {
+      this.logger.warn('RESEND_API_KEY non configurato — email cancellazione account non inviata');
+      return;
+    }
+    const name = firstName ? ` ${firstName.replace(/[&<>"]/g, '')}` : '';
+    try {
+      await this.resend.emails.send({
+        from: 'ProntoPsicologo <onboarding@resend.dev>',
+        to,
+        subject: 'Il tuo account è stato eliminato — Luminia Care',
+        html: `<!DOCTYPE html>
+<html>
+<head><meta charset="UTF-8"><style>
+  body{font-family:Arial,sans-serif;background:#f5f5f5;margin:0;padding:40px 20px}
+  .card{background:white;border-radius:16px;padding:40px;max-width:480px;margin:0 auto}
+  h2{color:#1a1a2e;margin-top:0}
+  p{color:#555;line-height:1.6}
+  .footer{color:#aaa;font-size:12px;margin-top:24px}
+</style></head>
+<body>
+  <div class="card">
+    <h2>Account eliminato</h2>
+    <p>Ciao${name}, come richiesto abbiamo eliminato definitivamente il tuo account e i dati associati.
+       Eventuali abbonamenti attivi sono stati disdetti e non riceverai altri addebiti.</p>
+    <p class="footer">Se non hai richiesto tu la cancellazione, contatta subito l'assistenza rispondendo a questa email.</p>
+  </div>
+</body>
+</html>`,
+      });
+    } catch (e: any) {
+      this.logger.error('Invio email cancellazione account fallito: ' + e.message);
+    }
+  }
+
   /**
    * Avviso agli admin di una nuova segnalazione. Volutamente NON include il testo
    * della segnalazione né i messaggi (dati potenzialmente sanitari): il dettaglio

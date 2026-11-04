@@ -9,6 +9,9 @@ const USER_SUMMARY = { select: { id: true, firstName: true, lastName: true, emai
 
 type NamedUser = { firstName: string | null; lastName: string | null; role: string };
 
+const userLabel = (u: NamedUser) =>
+  `${[u.firstName, u.lastName].filter(Boolean).join(' ') || '—'} (${u.role === 'PSYCHOLOGIST' ? 'psicologo' : 'utente'})`;
+
 @Injectable()
 export class ReportService {
   private readonly logger = new Logger(ReportService.name);
@@ -41,10 +44,17 @@ export class ReportService {
     });
     if (pending) throw new ConflictException('Hai già una segnalazione aperta per questa conversazione');
 
+    const reportedUser = await this.prisma.user.findUniqueOrThrow({
+      where: { id: reportedUserId },
+      select: { firstName: true, lastName: true, role: true },
+    });
+
     const report = await this.prisma.report.create({
       data: {
         reporterUserId,
         reportedUserId,
+        // Resta leggibile anche se l'account segnalato viene poi cancellato
+        reportedLabel: userLabel(reportedUser),
         conversationId: conversation.id,
         reason: dto.reason,
         details: dto.details?.trim() || null,
@@ -53,7 +63,8 @@ export class ReportService {
     });
 
     // Notifica admin best-effort: non blocca né fa fallire la segnalazione
-    void this.notifyAdmins(report).catch(e => this.logger.error('Notifica segnalazione fallita: ' + e.message));
+    void this.notifyAdmins({ reason: report.reason, reporter: report.reporter!, reported: report.reported! })
+      .catch(e => this.logger.error('Notifica segnalazione fallita: ' + e.message));
 
     return { id: report.id, status: report.status };
   }
@@ -101,13 +112,11 @@ export class ReportService {
     const openForReported = await this.prisma.report.count({
       where: { reportedUserId: report.reported.id, status: { in: ['OPEN', 'IN_REVIEW'] } },
     });
-    const label = (u: NamedUser) =>
-      `${[u.firstName, u.lastName].filter(Boolean).join(' ') || '—'} (${u.role === 'PSYCHOLOGIST' ? 'psicologo' : 'utente'})`;
 
     await this.email.sendReportNotification(recipients, {
       reason: REPORT_REASONS[report.reason as ReportReason] ?? report.reason,
-      reporter: label(report.reporter),
-      reported: label(report.reported),
+      reporter: userLabel(report.reporter),
+      reported: userLabel(report.reported),
       openForReported,
     });
   }

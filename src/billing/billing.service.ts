@@ -132,8 +132,28 @@ export class BillingService {
     return { received: true };
   }
 
+  /**
+   * Disdice subito l'abbonamento Stripe (usato alla cancellazione dell'account).
+   * Lancia errore se Stripe non risponde: meglio bloccare la cancellazione che
+   * continuare ad addebitare un account che non esiste più.
+   */
+  async cancelSubscriptionNow(subscriptionId: string): Promise<void> {
+    if (!this.stripe) throw new InternalServerErrorException('Pagamenti non configurati');
+    try {
+      await this.stripe.subscriptions.cancel(subscriptionId);
+    } catch (e: any) {
+      // Già disdetto o inesistente: nessun addebito futuro, si può procedere
+      if (e?.code === 'resource_missing') return;
+      const sub = await this.stripe.subscriptions.retrieve(subscriptionId).catch(() => null);
+      if (sub?.status === 'canceled') return;
+      throw e;
+    }
+  }
+
   private async setSubscription(psychologistId: string, active: boolean, subscriptionId: string | null) {
-    await this.prisma.psychologist.update({
+    // updateMany: se il profilo è stato cancellato nel frattempo non lanciare
+    // errore (Stripe ritenterebbe il webhook all'infinito)
+    await this.prisma.psychologist.updateMany({
       where: { id: psychologistId },
       data: {
         subscriptionActive: active,

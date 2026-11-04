@@ -21,6 +21,7 @@ import { SpecializationModule } from './specialization/specialization.module';
 import { EmailModule } from './email/email.module';
 import { BillingModule } from './billing/billing.module';
 import { ReportModule } from './report/report.module';
+import { AccountModule } from './account/account.module';
 
 @Module({
   imports: [
@@ -43,6 +44,7 @@ import { ReportModule } from './report/report.module';
     SpecializationModule,
     BillingModule,
     ReportModule,
+    AccountModule,
   ],
   controllers: [AppController],
   providers: [
