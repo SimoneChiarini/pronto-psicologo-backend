@@ -129,10 +129,6 @@ export class PsychologistService {
     return this.prisma.psychologist.update({ where: { id }, data: updateData });
   }
 
-  remove(id: string): Promise<Psychologist> {
-    return this.prisma.psychologist.delete({ where: { id } });
-  }
-
   async aiRank(query: string): Promise<any[]> {
     const cacheKey = query.trim().toLowerCase();
     const cached = this.aiCache.get(cacheKey);

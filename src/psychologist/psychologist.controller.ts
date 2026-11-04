@@ -3,10 +3,14 @@ import { PsychologistService } from './psychologist.service';
 import { UpdatePsychologistDto } from './dto/update-psychologist.dto';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { OptionalJwtAuthGuard } from '../auth/optional-jwt-auth.guard';
+import { AccountService } from '../account/account.service';
 
 @Controller('psychologists')
 export class PsychologistController {
-  constructor(private readonly psychologistService: PsychologistService) {}
+  constructor(
+    private readonly psychologistService: PsychologistService,
+    private readonly accountService: AccountService,
+  ) {}
 
   // Richiede auth per prevenire abuso della API key Anthropic
   @UseGuards(JwtAuthGuard)
@@ -48,8 +52,10 @@ export class PsychologistController {
 
   @UseGuards(JwtAuthGuard)
   @Delete(':id')
-  async remove(@Param('id') id: string, @Request() req) {
+  async remove(@Param('id', ParseUUIDPipe) id: string, @Request() req) {
     if (req.user.role !== 'ADMIN') throw new ForbiddenException();
-    return this.psychologistService.remove(id);
+    // Elimina l'intero account (non solo il profilo: un utente PSYCHOLOGIST senza
+    // profilo resterebbe inutilizzabile) passando dalla procedura completa
+    return this.accountService.deletePsychologistByAdmin(req.user.userId, id);
   }
 }

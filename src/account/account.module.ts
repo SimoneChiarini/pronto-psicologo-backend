@@ -9,5 +9,6 @@ import { AccountController } from './account.controller';
   imports: [PrismaModule, BillingModule, StorageModule],
   providers: [AccountService],
   controllers: [AccountController],
+  exports: [AccountService],
 })
 export class AccountModule {}

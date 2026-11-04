@@ -28,7 +28,6 @@ export class UserService {
     return this.prisma.user.update({ where: { id }, data, select: this.SAFE_SELECT });
   }
 
-  remove(id: string) {
-    return this.prisma.user.delete({ where: { id }, select: this.SAFE_SELECT });
-  }
+  // Nessun remove() qui: la cancellazione passa sempre da AccountService
+  // (disdetta Stripe, file su storage, email), mai da un delete diretto.
 }

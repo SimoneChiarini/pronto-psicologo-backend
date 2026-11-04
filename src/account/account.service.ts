@@ -39,6 +39,41 @@ export class AccountService {
    * per obblighi fiscali.
    */
   async deleteAccount(userId: string, password: string): Promise<{ message: string }> {
+    const user = await this.loadForDeletion(userId);
+    if (user.role === 'ADMIN') {
+      throw new ForbiddenException('Gli account amministratore non possono essere eliminati dall\'app');
+    }
+    if (!(await bcrypt.compare(password, user.password))) {
+      throw new BadRequestException('Password non corretta');
+    }
+    await this.purge(user, 'self');
+    return { message: 'Account eliminato definitivamente.' };
+  }
+
+  /**
+   * Cancellazione da parte di un admin: stessa procedura (disdetta Stripe,
+   * cascata, file), senza password dell'utente. Non si possono eliminare
+   * altri admin né sé stessi.
+   */
+  async deleteByAdmin(adminUserId: string, targetUserId: string): Promise<{ message: string }> {
+    if (adminUserId === targetUserId) throw new ForbiddenException('Non puoi eliminare il tuo account');
+    const user = await this.loadForDeletion(targetUserId);
+    if (user.role === 'ADMIN') throw new ForbiddenException('Gli account amministratore non possono essere eliminati');
+    await this.purge(user, 'admin', adminUserId);
+    return { message: 'Account eliminato definitivamente.' };
+  }
+
+  /** Come deleteByAdmin, partendo dall'id del profilo psicologo. */
+  async deletePsychologistByAdmin(adminUserId: string, psychologistId: string) {
+    const psych = await this.prisma.psychologist.findUnique({
+      where: { id: psychologistId },
+      select: { userId: true },
+    });
+    if (!psych) throw new NotFoundException('Psicologo non trovato');
+    return this.deleteByAdmin(adminUserId, psych.userId);
+  }
+
+  private async loadForDeletion(userId: string) {
     const user = await this.prisma.user.findUnique({
       where: { id: userId },
       select: {
@@ -59,13 +94,15 @@ export class AccountService {
       },
     });
     if (!user) throw new NotFoundException('Account non trovato');
-    if (user.role === 'ADMIN') {
-      throw new ForbiddenException('Gli account amministratore non possono essere eliminati dall\'app');
-    }
-    if (!(await bcrypt.compare(password, user.password))) {
-      throw new BadRequestException('Password non corretta');
-    }
+    return user;
+  }
 
+  private async purge(
+    user: Awaited<ReturnType<AccountService['loadForDeletion']>>,
+    by: 'self' | 'admin',
+    adminUserId?: string,
+  ): Promise<void> {
+    const userId = user.id;
     const psych = user.psychologist;
     if (psych?.stripeSubscriptionId) {
       try {
@@ -93,9 +130,12 @@ export class AccountService {
     ]);
 
     void Promise.all([...new Set(files)].map(f => this.storage.deleteByUrl(f)));
-    void this.email.sendAccountDeletedEmail(user.email, user.firstName);
+    void this.email.sendAccountDeletedEmail(user.email, user.firstName, by === 'admin');
 
-    this.logger.log(`Account ${userId} (${user.role}) eliminato su richiesta dell'utente`);
-    return { message: 'Account eliminato definitivamente.' };
+    this.logger.log(
+      by === 'admin'
+        ? `Account ${userId} (${user.role}) eliminato dall'admin ${adminUserId}`
+        : `Account ${userId} (${user.role}) eliminato su richiesta dell'utente`,
+    );
   }
 }

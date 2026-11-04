@@ -86,7 +86,7 @@ export class EmailService {
     }
   }
 
-  async sendAccountDeletedEmail(to: string, firstName: string | null): Promise<void> {
+  async sendAccountDeletedEmail(to: string, firstName: string | null, byAdmin = false): Promise<void> {
     if (!this.resend) {
       this.logger.warn('RESEND_API_KEY non configurato — email cancellazione account non inviata');
       return;
@@ -109,9 +109,13 @@ export class EmailService {
 <body>
   <div class="card">
     <h2>Account eliminato</h2>
-    <p>Ciao${name}, come richiesto abbiamo eliminato definitivamente il tuo account e i dati associati.
+    <p>Ciao${name}, ${byAdmin
+      ? 'il tuo account è stato rimosso dal team di Luminia Care e i dati associati sono stati eliminati.'
+      : 'come richiesto abbiamo eliminato definitivamente il tuo account e i dati associati.'}
        Eventuali abbonamenti attivi sono stati disdetti e non riceverai altri addebiti.</p>
-    <p class="footer">Se non hai richiesto tu la cancellazione, contatta subito l'assistenza rispondendo a questa email.</p>
+    <p class="footer">${byAdmin
+      ? 'Per chiarimenti puoi contattare l\'assistenza rispondendo a questa email.'
+      : 'Se non hai richiesto tu la cancellazione, contatta subito l\'assistenza rispondendo a questa email.'}</p>
   </div>
 </body>
 </html>`,
