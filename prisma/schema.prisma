@@ -31,6 +31,8 @@ model User {
   Review        Review[]
   sentMessages  Message[]
   appointments  Appointment[]
+  reportsMade     Report[]       @relation("ReportReporter")
+  reportsReceived Report[]       @relation("ReportReported")
 }
 
 model Psychologist {
@@ -125,6 +127,7 @@ model Conversation {
   Psychologist    Psychologist @relation(fields: [psychologistId], references: [id], onDelete: Cascade, onUpdate: NoAction)
   User            User         @relation(fields: [userId], references: [id], onDelete: Cascade, onUpdate: NoAction)
   messages        Message[]
+  reports         Report[]
 }
 
 model Message {
@@ -184,4 +187,28 @@ model Review {
   createdAt      DateTime?    @default(now()) @db.Timestamp(6)
   Psychologist   Psychologist @relation(fields: [psychologistId], references: [id], onDelete: Cascade, onUpdate: NoAction)
   User           User         @relation(fields: [userId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  // Una sola recensione per coppia utente/psicologo
+  @@unique([userId, psychologistId])
+}
+
+// Segnalazione di uso scorretto fatta da una delle due parti di una conversazione.
+// Il segnalato è sempre l'altra parte (ricavato dal backend, mai dal client).
+model Report {
+  id             String        @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  reporterUserId String        @db.Uuid
+  reportedUserId String        @db.Uuid
+  conversationId String?       @db.Uuid
+  reason         String        @db.VarChar(40)
+  details        String?
+  status         String        @default("OPEN") @db.VarChar(20) // OPEN | IN_REVIEW | RESOLVED | DISMISSED
+  adminNote      String?
+  createdAt      DateTime      @default(now()) @db.Timestamp(6)
+  resolvedAt     DateTime?     @db.Timestamp(6)
+  reporter       User          @relation("ReportReporter", fields: [reporterUserId], references: [id], onDelete: Cascade)
+  reported       User          @relation("ReportReported", fields: [reportedUserId], references: [id], onDelete: Cascade)
+  conversation   Conversation? @relation(fields: [conversationId], references: [id], onDelete: SetNull)
+
+  @@index([status])
+  @@index([reportedUserId])
 }

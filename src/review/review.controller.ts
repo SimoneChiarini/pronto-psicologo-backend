@@ -10,7 +10,16 @@ export class ReviewController {
   @UseGuards(JwtAuthGuard)
   @Post()
   create(@Body() data: CreateReviewDto, @Request() req) {
-    return this.reviewService.create({ ...data, userId: req.user.userId });
+    if (req.user.role !== 'USER') throw new ForbiddenException('Solo i clienti possono lasciare recensioni');
+    return this.reviewService.create(req.user.userId, data);
+  }
+
+  // Dice al client se mostrare il pulsante "Lascia una recensione"
+  @UseGuards(JwtAuthGuard)
+  @Get('eligibility/:psychologistId')
+  eligibility(@Param('psychologistId') psychologistId: string, @Request() req) {
+    if (req.user.role !== 'USER') return { canReview: false, alreadyReviewed: false };
+    return this.reviewService.getEligibility(req.user.userId, psychologistId);
   }
 
   @Get()

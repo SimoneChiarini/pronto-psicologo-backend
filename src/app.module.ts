@@ -20,6 +20,7 @@ import { PostModule } from './post/post.module';
 import { SpecializationModule } from './specialization/specialization.module';
 import { EmailModule } from './email/email.module';
 import { BillingModule } from './billing/billing.module';
+import { ReportModule } from './report/report.module';
 
 @Module({
   imports: [
@@ -41,6 +42,7 @@ import { BillingModule } from './billing/billing.module';
     PostModule,
     SpecializationModule,
     BillingModule,
+    ReportModule,
   ],
   controllers: [AppController],
   providers: [
