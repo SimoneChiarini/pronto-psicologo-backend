@@ -1,9 +1,10 @@
-import { Controller, Post, Get, Patch, Body, Request, Query, Res, UnauthorizedException, UseGuards } from '@nestjs/common';
+import { Controller, Post, Get, Patch, Body, Request, Query, Res, UnauthorizedException, UseGuards, HttpCode } from '@nestjs/common';
 import { Throttle, SkipThrottle } from '@nestjs/throttler';
 import { Response } from 'express';
 import { AuthService } from './auth.service';
 import { RegisterDto } from './dto/register.dto';
 import { LoginDto } from './dto/login.dto';
+import { ForgotPasswordDto, ResetPasswordDto } from './dto/password-reset.dto';
 import { JwtAuthGuard } from './jwt-auth.guard';
 
 @Controller('auth')
@@ -24,6 +25,20 @@ export class AuthController {
       throw new UnauthorizedException('Invalid credentials');
     }
     return this.authService.login(user);
+  }
+
+  @Throttle({ default: { ttl: 60000, limit: 3 } })
+  @Post('forgot-password')
+  @HttpCode(200)
+  forgotPassword(@Body() body: ForgotPasswordDto) {
+    return this.authService.requestPasswordReset(body.email);
+  }
+
+  @Throttle({ default: { ttl: 60000, limit: 5 } })
+  @Post('reset-password')
+  @HttpCode(200)
+  resetPassword(@Body() body: ResetPasswordDto) {
+    return this.authService.resetPassword(body.token, body.password);
   }
 
   @UseGuards(JwtAuthGuard)

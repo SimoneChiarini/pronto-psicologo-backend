@@ -46,6 +46,46 @@ export class EmailService {
     }
   }
 
+  async sendPasswordResetEmail(to: string, token: string): Promise<void> {
+    if (!this.resend) {
+      this.logger.warn('RESEND_API_KEY non configurato — email reset password non inviata');
+      return;
+    }
+    // L'app web usa l'hash routing di Flutter: la pagina è /#/reset-password
+    const frontendUrl = (process.env.FRONTEND_URL ?? 'http://localhost:8080').replace(/\/+$/, '');
+    const link = `${frontendUrl}/#/reset-password?token=${token}`;
+    try {
+      await this.resend.emails.send({
+        from: 'ProntoPsicologo <onboarding@resend.dev>',
+        to,
+        subject: 'Reimposta la tua password — Luminia Care',
+        html: `<!DOCTYPE html>
+<html>
+<head><meta charset="UTF-8"><style>
+  body{font-family:Arial,sans-serif;background:#f5f5f5;margin:0;padding:40px 20px}
+  .card{background:white;border-radius:16px;padding:40px;max-width:480px;margin:0 auto}
+  h2{color:#1a1a2e;margin-top:0}
+  p{color:#555;line-height:1.6}
+  .btn{display:inline-block;padding:14px 28px;background:#1a1a2e;color:white;
+       border-radius:8px;text-decoration:none;font-weight:bold;margin:16px 0}
+  .footer{color:#aaa;font-size:12px;margin-top:24px}
+</style></head>
+<body>
+  <div class="card">
+    <h2>Reimposta la password</h2>
+    <p>Abbiamo ricevuto una richiesta di reimpostazione della password del tuo account.</p>
+    <a href="${link}" class="btn">Scegli una nuova password</a>
+    <p class="footer">Il link scade tra 1 ora e si può usare una sola volta.
+      Se non hai chiesto tu il reset, ignora questa email: la tua password resta invariata.</p>
+  </div>
+</body>
+</html>`,
+      });
+    } catch (e: any) {
+      this.logger.error('Invio email reset password fallito: ' + e.message);
+    }
+  }
+
   /**
    * Avviso agli admin di una nuova segnalazione. Volutamente NON include il testo
    * della segnalazione né i messaggi (dati potenzialmente sanitari): il dettaglio

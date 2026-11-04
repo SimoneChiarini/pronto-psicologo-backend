@@ -5,13 +5,9 @@ export class UpdatePsychologistDto {
   @IsString()
   bio?: string;
 
-  @IsOptional()
-  @IsBoolean()
-  verified?: boolean;
-
-  @IsOptional()
-  @IsBoolean()
-  subscriptionActive?: boolean;
+  // verified / subscriptionActive NON sono qui di proposito: altrimenti uno
+  // psicologo potrebbe auto-verificarsi o attivarsi senza pagare. Si cambiano
+  // solo da PATCH /admin/psychologists/:id/verify e dal webhook Stripe.
 
   @IsOptional()
   @IsBoolean()

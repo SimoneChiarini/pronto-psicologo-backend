@@ -24,6 +24,9 @@ model User {
   emailVerified            Boolean        @default(false)
   emailVerificationToken   String?        @db.VarChar(200)
   emailVerificationExpires DateTime?
+  // Recupero password: si salva solo lo SHA-256 del token inviato via email
+  passwordResetTokenHash   String?        @unique @db.VarChar(64)
+  passwordResetExpires     DateTime?
   createdAt                DateTime?      @default(now()) @db.Timestamp(6)
   Conversation             Conversation[]
   psychologist             Psychologist?

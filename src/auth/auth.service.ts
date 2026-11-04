@@ -111,6 +111,63 @@ export class AuthService {
     });
   }
 
+  // ── Recupero password ─────────────────────────────────────
+
+  private static readonly RESET_TTL_MS = 60 * 60 * 1000; // 1 ora
+
+  private static hashResetToken(token: string): string {
+    return crypto.createHash('sha256').update(token).digest('hex');
+  }
+
+  /**
+   * Risponde sempre allo stesso modo, che l'email esista o meno, per non
+   * rivelare quali indirizzi sono registrati. L'email parte in background così
+   * anche il tempo di risposta non distingue i due casi.
+   */
+  async requestPasswordReset(email: string): Promise<{ message: string }> {
+    const message = 'Se l\'indirizzo è registrato, riceverai un\'email con il link per reimpostare la password.';
+    const user = await this.prisma.user.findUnique({
+      where: { email: email.trim().toLowerCase() },
+      select: { id: true, email: true },
+    });
+    if (!user) return { message };
+
+    // Un nuovo link invalida quello precedente (il campo viene sovrascritto)
+    const token = crypto.randomBytes(32).toString('hex');
+    await this.prisma.user.update({
+      where: { id: user.id },
+      data: {
+        passwordResetTokenHash: AuthService.hashResetToken(token),
+        passwordResetExpires: new Date(Date.now() + AuthService.RESET_TTL_MS),
+      },
+    });
+    void this.emailService.sendPasswordResetEmail(user.email, token);
+    return { message };
+  }
+
+  async resetPassword(token: string, newPassword: string): Promise<{ message: string }> {
+    const password = await bcrypt.hash(newPassword, 10);
+    // updateMany con il token nel where = consumo atomico: due richieste in
+    // parallelo con lo stesso link non possono riuscire entrambe.
+    const { count } = await this.prisma.user.updateMany({
+      where: {
+        passwordResetTokenHash: AuthService.hashResetToken(token),
+        passwordResetExpires: { gt: new Date() },
+      },
+      data: {
+        password,
+        passwordResetTokenHash: null,
+        passwordResetExpires: null,
+        // Il link è arrivato a quella casella: l'email è dimostrata
+        emailVerified: true,
+        emailVerificationToken: null,
+        emailVerificationExpires: null,
+      },
+    });
+    if (count === 0) throw new BadRequestException('Link non valido o scaduto. Richiedine uno nuovo.');
+    return { message: 'Password aggiornata. Ora puoi accedere.' };
+  }
+
   async verifyPhone(userId: string, firebaseToken: string): Promise<{ message: string }> {
     const decoded = await this.firebaseService.verifyIdToken(firebaseToken);
     if (!decoded || !decoded.phone_number) {
