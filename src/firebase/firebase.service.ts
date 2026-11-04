@@ -13,7 +13,7 @@ export class FirebaseService {
       return;
     }
     try {
-      const serviceAccount = JSON.parse(raw) as admin.ServiceAccount;
+      const serviceAccount = FirebaseService.parseServiceAccount(raw) as admin.ServiceAccount;
       if (!admin.apps.length) {
         admin.initializeApp({ credential: admin.credential.cert(serviceAccount) });
       }
@@ -24,12 +24,47 @@ export class FirebaseService {
     }
   }
 
-  async sendToToken(token: string, title: string, body: string): Promise<void> {
-    if (!this.messaging) return;
+  /**
+   * Accetta il JSON del service account anche nelle forme in cui finisce spesso
+   * nelle variabili d'ambiente dei pannelli di hosting: tra virgolette, senza
+   * graffe esterne (errore "position 6" visto su Railway) o codificato in base64.
+   */
+  static parseServiceAccount(raw: string): Record<string, unknown> {
+    let v = raw.trim();
+    if ((v.startsWith("'") && v.endsWith("'")) || (v.startsWith('"{') && v.endsWith('}"'))) v = v.slice(1, -1);
+    if (!v.startsWith('{') && !v.startsWith('"') && /^[A-Za-z0-9+/=\s]+$/.test(v)) {
+      v = Buffer.from(v, 'base64').toString('utf8').trim();
+    }
+    if (v.startsWith('"type"')) v = `{${v.replace(/,\s*$/, '')}}`;
+    const parsed = JSON.parse(v);
+    if (typeof parsed.private_key === 'string') {
+      // Alcuni pannelli raddoppiano gli escape: "\\n" → a capo vero
+      parsed.private_key = parsed.private_key.replace(/\\n/g, '\n');
+    }
+    return parsed;
+  }
+
+  /**
+   * Invia una push. Ritorna false se il token non è più valido (app disinstallata,
+   * permesso revocato): il chiamante può cancellarlo.
+   */
+  async sendToToken(token: string, title: string, body: string, data?: Record<string, string>): Promise<boolean> {
+    if (!this.messaging) return true;
     try {
-      await this.messaging.send({ token, notification: { title, body } });
+      await this.messaging.send({
+        token,
+        notification: { title, body },
+        data,
+        webpush: { fcmOptions: { link: process.env.FRONTEND_URL?.replace(/\/+$/, '') || undefined } },
+      });
+      return true;
     } catch (e: any) {
+      const code = e?.errorInfo?.code ?? e?.code;
+      if (code === 'messaging/registration-token-not-registered' || code === 'messaging/invalid-registration-token') {
+        return false;
+      }
       this.logger.warn(`FCM invio fallito: ${e.message}`);
+      return true;
     }
   }
 

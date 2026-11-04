@@ -1,6 +1,7 @@
 import { BadRequestException, ForbiddenException, Injectable, InternalServerErrorException, Logger, NotFoundException } from '@nestjs/common';
 import Stripe from 'stripe';
 import { PrismaService } from '../prisma/prisma.service';
+import { NotificationService } from '../realtime/notification.service';
 
 @Injectable()
 export class BillingService {
@@ -9,7 +10,7 @@ export class BillingService {
     ? new Stripe(process.env.STRIPE_SECRET_KEY)
     : null;
 
-  constructor(private prisma: PrismaService) {}
+  constructor(private prisma: PrismaService, private notifications: NotificationService) {}
 
   private get frontendUrl(): string {
     return process.env.FRONTEND_URL ?? 'http://localhost:8080';
@@ -251,7 +252,10 @@ export class BillingService {
 
     const seat = await this.prisma.supervisionParticipant.findUnique({
       where: { supervisionId_psychologistId: { supervisionId, psychologistId } },
-      include: { supervision: { select: { groupId: true } } },
+      include: {
+        supervision: { select: { groupId: true, supervisorId: true } },
+        psychologist: { select: { user: { select: { firstName: true, lastName: true } } } },
+      },
     });
     if (!seat) {
       // Partecipante cancellato nel frattempo: il rimborso va fatto a mano
@@ -278,6 +282,20 @@ export class BillingService {
           create: { groupId, psychologistId, role: 'MEMBER', status: 'ACTIVE', confidentialityAcceptedAt: new Date() },
         });
       }
+    });
+
+    const payer = [seat.psychologist.user.firstName, seat.psychologist.user.lastName].filter(Boolean).join(' ') || 'Un collega';
+    this.notifications.notifyPsychologists([seat.supervision.supervisorId], {
+      type: 'supervision',
+      title: 'Pagamento ricevuto',
+      body: `${payer} ha pagato ed è entrato nella stanza di supervisione`,
+      supervisionId,
+    });
+    this.notifications.notifyPsychologists([psychologistId], {
+      type: 'supervision',
+      title: 'Pagamento confermato',
+      body: 'Ora puoi entrare nella stanza di supervisione',
+      supervisionId,
     });
   }
 

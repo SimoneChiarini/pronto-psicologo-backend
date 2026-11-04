@@ -7,6 +7,8 @@ import {
   CreateCaseDto, CreateCaseMessageDto, CreateGroupDto, CreateMeetingDto, UpdateCaseDto, UpdateGroupDto,
 } from './dto/peer.dto';
 import { assertAnonymized, isAllowedMeetingUrl } from './anonymization';
+import { RealtimeService } from '../realtime/realtime.service';
+import { NotificationService } from '../realtime/notification.service';
 
 const MODERATOR_ROLES = ['OWNER', 'MODERATOR', 'SUPERVISOR'];
 
@@ -29,7 +31,26 @@ export const toColleague = (p: ColleagueRow | null) => p && ({
 
 @Injectable()
 export class PeerService {
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private realtime: RealtimeService,
+    private notifications: NotificationService,
+  ) {}
+
+  // ── Notifiche (mai contenuti clinici: solo nome del gruppo e del collega) ──
+
+  private async psychName(psychId: string) {
+    const p = await this.prisma.psychologist.findUnique({ where: { id: psychId }, select: COLLEAGUE_SELECT });
+    return toColleague(p)?.name ?? 'Un collega';
+  }
+
+  private async memberIds(groupId: string, roles?: string[]) {
+    const rows = await this.prisma.peerGroupMember.findMany({
+      where: { groupId, status: 'ACTIVE', ...(roles ? { role: { in: roles } } : {}) },
+      select: { psychologistId: true },
+    });
+    return rows.map(r => r.psychologistId);
+  }
 
   // ── Helpers di accesso ────────────────────────────────────
 
@@ -217,6 +238,12 @@ export class PeerService {
     await this.prisma.peerGroupMember.create({
       data: { groupId, psychologistId: psychId, role: 'MEMBER', status: 'REQUESTED', confidentialityAcceptedAt: new Date() },
     });
+    this.notifications.notifyPsychologists(await this.memberIds(groupId, MODERATOR_ROLES), {
+      type: 'group_request',
+      title: 'Richiesta di ingresso',
+      body: `${await this.psychName(psychId)} vuole entrare in «${group.name}»`,
+      groupId,
+    });
     return { status: 'REQUESTED' };
   }
 
@@ -275,6 +302,12 @@ export class PeerService {
     await this.prisma.peerGroupMember.create({
       data: { groupId, psychologistId: targetId, role: 'MEMBER', status: 'INVITED' },
     });
+    this.notifications.notifyPsychologists([targetId], {
+      type: 'group_invite',
+      title: 'Invito a un gruppo di intervisione',
+      body: `${await this.psychName(psychId)} ti ha invitato in «${me.group.name}»`,
+      groupId,
+    });
     return { status: 'INVITED' };
   }
 
@@ -289,6 +322,12 @@ export class PeerService {
     await this.prisma.peerGroupMember.update({
       where: { groupId_psychologistId: { groupId, psychologistId: targetId } },
       data: { status: 'ACTIVE', joinedAt: new Date() },
+    });
+    this.notifications.notifyPsychologists([targetId], {
+      type: 'group_approved',
+      title: 'Richiesta accettata',
+      body: `Ora fai parte di «${me.group.name}»`,
+      groupId,
     });
     return { status: 'ACTIVE' };
   }
@@ -384,6 +423,13 @@ export class PeerService {
       },
     });
     await this.touchGroup(groupId);
+    this.notifications.notifyPsychologists(await this.memberIds(groupId), {
+      type: 'case_new',
+      title: me.group.type === 'SUPERVISION' ? 'Nuovo caso in supervisione' : 'Nuovo caso nel gruppo',
+      body: `${await this.psychName(psychId)} ha presentato un caso in «${me.group.name}»`,
+      groupId,
+      caseId: c.id,
+    }, psychId);
     return { id: c.id };
   }
 
@@ -449,6 +495,22 @@ export class PeerService {
     });
     await this.prisma.caseDiscussion.update({ where: { id: caseId }, data: { lastActivityAt: new Date() } });
     await this.touchGroup(c.groupId);
+
+    this.realtime.toCase(caseId, 'case:message', { caseId, messageId: msg.id });
+    // "Chi segue il caso": autore + chi ha già scritto (+ supervisore nelle stanze di supervisione)
+    const writers = await this.prisma.caseMessage.findMany({
+      where: { caseId, authorId: { not: null } },
+      select: { authorId: true },
+      distinct: ['authorId'],
+    });
+    const supervisors = me.group.type === 'SUPERVISION' ? await this.memberIds(c.groupId, ['SUPERVISOR']) : [];
+    this.notifications.notifyPsychologists([c.authorId, ...writers.map(w => w.authorId), ...supervisors], {
+      type: 'case_message',
+      title: 'Nuovo intervento',
+      body: `${await this.psychName(psychId)} ha risposto in un caso di «${me.group.name}»`,
+      groupId: c.groupId,
+      caseId,
+    }, psychId);
     return { id: msg.id };
   }
 
@@ -459,6 +521,7 @@ export class PeerService {
       where: { id: messageId },
       data: { deletedAt: new Date(), content: '' }, // il testo viene davvero rimosso
     });
+    this.realtime.toCase(msg.caseId, 'case:message', { caseId: msg.caseId, messageId });
     return { ok: true };
   }
 
@@ -479,6 +542,15 @@ export class PeerService {
       data: { groupId, createdById: psychId, title: dto.title.trim(), startsAt, url },
     });
     await this.touchGroup(groupId);
+    const when = startsAt.toLocaleString('it-IT', {
+      timeZone: 'Europe/Rome', day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit',
+    });
+    this.notifications.notifyPsychologists(await this.memberIds(groupId), {
+      type: 'meeting',
+      title: 'Nuovo incontro in videochiamata',
+      body: `«${me.group.name}» · ${when}`,
+      groupId,
+    }, psychId);
     return { id: m.id };
   }
 

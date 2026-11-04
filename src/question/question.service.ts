@@ -107,7 +107,8 @@ export class QuestionService {
     await this.firebaseService.sendToTokens(
       tokens,
       'Nuova domanda disponibile',
-      `${sender} ha posto una domanda: "${question.title}"`,
+      // Niente titolo della domanda: la push compare sulla schermata di blocco
+      `${sender} ha posto una nuova domanda`,
     );
   }
 

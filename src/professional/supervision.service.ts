@@ -7,6 +7,7 @@ import { BillingService } from '../billing/billing.service';
 import { CreateSupervisionDto, UpsertSupervisorProfileDto } from './dto/supervision.dto';
 import { assertAnonymized } from './anonymization';
 import { COLLEAGUE_SELECT, toColleague } from './peer.service';
+import { NotificationService } from '../realtime/notification.service';
 
 /** Commissione della piattaforma sulle supervisioni (fissata su ogni richiesta). */
 export const SUPERVISION_FEE_PERCENT = 10;
@@ -17,7 +18,26 @@ const feeFor = (amountCents: number, percent: number) => Math.round((amountCents
 export class SupervisionService {
   private readonly logger = new Logger(SupervisionService.name);
 
-  constructor(private prisma: PrismaService, private billing: BillingService) {}
+  constructor(
+    private prisma: PrismaService,
+    private billing: BillingService,
+    private notifications: NotificationService,
+  ) {}
+
+  private async nameOf(psychId: string | null) {
+    if (!psychId) return 'Un collega';
+    const p = await this.prisma.psychologist.findUnique({ where: { id: psychId }, select: COLLEAGUE_SELECT });
+    return toColleague(p)?.name ?? 'Un collega';
+  }
+
+  /** Partecipanti ancora coinvolti (esclusi quelli che hanno rifiutato). */
+  private async participantIds(supervisionId: string) {
+    const rows = await this.prisma.supervisionParticipant.findMany({
+      where: { supervisionId, status: { not: 'DECLINED' } },
+      select: { psychologistId: true },
+    });
+    return rows.map(r => r.psychologistId);
+  }
 
   // ── Profilo supervisore ───────────────────────────────────
 
@@ -187,6 +207,21 @@ export class SupervisionService {
         },
       },
     });
+    const requester = await this.nameOf(psychId);
+    this.notifications.notifyPsychologists([dto.supervisorId], {
+      type: 'supervision',
+      title: 'Nuova richiesta di supervisione',
+      body: `${requester} ti chiede una supervisione ${dto.mode === 'GROUP' ? 'di gruppo' : 'individuale'}`,
+      supervisionId: s.id,
+    });
+    if (colleagueIds.length) {
+      this.notifications.notifyPsychologists(colleagueIds, {
+        type: 'supervision',
+        title: 'Invito a una supervisione',
+        body: `${requester} ti ha coinvolto in una supervisione con ${await this.nameOf(dto.supervisorId)}`,
+        supervisionId: s.id,
+      });
+    }
     return { id: s.id };
   }
 
@@ -271,8 +306,15 @@ export class SupervisionService {
     if (!s || s.supervisorId !== psychId) throw new NotFoundException('Supervisione non trovata');
     if (s.status !== 'REQUESTED') throw new BadRequestException('Hai già risposto a questa richiesta');
 
+    const supName = await this.nameOf(psychId);
     if (!accept) {
       await this.prisma.supervision.update({ where: { id }, data: { status: 'DECLINED', respondedAt: new Date() } });
+      this.notifications.notifyPsychologists(await this.participantIds(id), {
+        type: 'supervision',
+        title: 'Supervisione non disponibile',
+        body: `${supName} non può seguire questa richiesta`,
+        supervisionId: id,
+      });
       return { status: 'DECLINED' };
     }
 
@@ -302,6 +344,12 @@ export class SupervisionService {
         where: { id },
         data: { status: 'ACCEPTED', respondedAt: new Date(), groupId: group.id },
       });
+    });
+    this.notifications.notifyPsychologists(await this.participantIds(id), {
+      type: 'supervision',
+      title: 'Supervisione accettata',
+      body: `${supName} ha accettato: completa il pagamento per entrare nella stanza`,
+      supervisionId: id,
     });
     return { status: 'ACCEPTED' };
   }
@@ -370,6 +418,12 @@ export class SupervisionService {
       this.prisma.supervision.update({ where: { id }, data: { status: 'COMPLETED', completedAt: new Date() } }),
       ...(s.groupId ? [this.prisma.peerGroup.update({ where: { id: s.groupId }, data: { archivedAt: new Date() } })] : []),
     ]);
+    this.notifications.notifyPsychologists(await this.participantIds(id), {
+      type: 'supervision',
+      title: 'Supervisione conclusa',
+      body: `${await this.nameOf(psychId)} ha concluso la supervisione`,
+      supervisionId: id,
+    });
     return { status: 'COMPLETED' };
   }
 

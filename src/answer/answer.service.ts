@@ -92,7 +92,8 @@ export class AnswerService {
     await this.firebaseService.sendToToken(
       fcmToken,
       'Hai ricevuto una risposta!',
-      `${psychName} ha risposto alla tua domanda: "${question!.title}"`,
+      // Niente titolo della domanda: la push compare sulla schermata di blocco
+      `${psychName} ha risposto alla tua domanda`,
     );
   }
 

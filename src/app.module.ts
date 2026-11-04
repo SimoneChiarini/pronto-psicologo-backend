@@ -23,6 +23,7 @@ import { BillingModule } from './billing/billing.module';
 import { ReportModule } from './report/report.module';
 import { AccountModule } from './account/account.module';
 import { ProfessionalModule } from './professional/professional.module';
+import { RealtimeModule } from './realtime/realtime.module';
 
 @Module({
   imports: [
@@ -47,6 +48,7 @@ import { ProfessionalModule } from './professional/professional.module';
     ReportModule,
     AccountModule,
     ProfessionalModule,
+    RealtimeModule,
   ],
   controllers: [AppController],
   providers: [
