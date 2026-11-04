@@ -1,7 +1,8 @@
-import { Controller, Get, Post, Put, Delete, Param, Body, UseGuards, Request, ForbiddenException, UnauthorizedException } from '@nestjs/common';
+import { Controller, Get, Post, Put, Delete, Param, Body, UseGuards, Request, ForbiddenException, ParseUUIDPipe } from '@nestjs/common';
 import { PsychologistService } from './psychologist.service';
 import { UpdatePsychologistDto } from './dto/update-psychologist.dto';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
+import { OptionalJwtAuthGuard } from '../auth/optional-jwt-auth.guard';
 
 @Controller('psychologists')
 export class PsychologistController {
@@ -19,9 +20,18 @@ export class PsychologistController {
     return this.psychologistService.findAll();
   }
 
+  // Prima di ':id', altrimenti "me" verrebbe preso come id
+  @UseGuards(JwtAuthGuard)
+  @Get('me')
+  findMine(@Request() req) {
+    if (req.user.role !== 'PSYCHOLOGIST') throw new ForbiddenException();
+    return this.psychologistService.findMine(req.user.userId);
+  }
+
+  @UseGuards(OptionalJwtAuthGuard)
   @Get(':id')
-  findOne(@Param('id') id: string) {
-    return this.psychologistService.findOne(id);
+  findOne(@Param('id', ParseUUIDPipe) id: string, @Request() req) {
+    return this.psychologistService.findPublic(id, req.user);
   }
 
   @UseGuards(JwtAuthGuard)

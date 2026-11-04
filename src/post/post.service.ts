@@ -1,13 +1,10 @@
 import { Injectable, ForbiddenException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
+import { PUBLIC_PSYCH_SELECT } from '../psychologist/psychologist.public';
 import { CreatePostDto } from './dto/create-post.dto';
 
 const PSYCH_INCLUDE = {
-  psychologist: {
-    include: {
-      user: { select: { firstName: true, lastName: true, profileImage: true } },
-    },
-  },
+  psychologist: { select: PUBLIC_PSYCH_SELECT },
 };
 
 @Injectable()

@@ -1,7 +1,8 @@
 import * as https from 'https';
-import { Injectable } from '@nestjs/common';
+import { Injectable, NotFoundException } from '@nestjs/common';
 import { Prisma, Psychologist } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
+import { PUBLIC_PSYCH_FIELDS } from './psychologist.public';
 import Anthropic from '@anthropic-ai/sdk';
 import { TAG_LABEL_MAP } from '../specialization/taxonomy';
 
@@ -21,29 +22,52 @@ export class PsychologistService {
     return this.prisma.psychologist.create({ data });
   }
 
-  private readonly PSYCH_INCLUDE = {
-    Review: { select: { rating: true } },
+  // Forma pubblica: solo campi non sensibili (vedi psychologist.public.ts)
+  private readonly PUBLIC_SELECT = {
+    ...PUBLIC_PSYCH_FIELDS,
     user: { select: { firstName: true, lastName: true } },
-    addresses: true,
+    Review: { select: { rating: true } },
+    addresses: { select: { id: true, address: true, latitude: true, longitude: true } },
     specializations: { select: { tagCode: true } },
-  };
+  } satisfies Prisma.PsychologistSelect;
 
   async findAll() {
     // Visibili agli utenti solo i profili verificati (albo) e con abbonamento attivo.
     const psychologists = await this.prisma.psychologist.findMany({
       where: { verified: true, subscriptionActive: true },
-      include: this.PSYCH_INCLUDE,
+      select: this.PUBLIC_SELECT,
     });
     return psychologists.map(p => this.withRating(p));
   }
 
-  findOne(id: string) {
-    return this.prisma.psychologist.findUnique({
+  /**
+   * Profilo pubblico. Un profilo non ancora pubblicato (non verificato o senza
+   * abbonamento) è visibile solo al proprietario e agli admin.
+   */
+  async findPublic(id: string, viewer?: { userId: string; role: string } | null) {
+    const p = await this.prisma.psychologist.findUnique({
       where: { id },
-      include: { addresses: true, specializations: { select: { tagCode: true } } },
-    }).then(p => p ? this.withRating(p as any) : null);
+      select: { ...this.PUBLIC_SELECT, userId: true, subscriptionActive: true },
+    });
+    if (!p) throw new NotFoundException('Psicologo non trovato');
+    const published = p.verified === true && p.subscriptionActive === true;
+    const canSee = published || viewer?.role === 'ADMIN' || viewer?.userId === p.userId;
+    if (!canSee) throw new NotFoundException('Psicologo non trovato');
+    const { userId, subscriptionActive, ...pub } = p;
+    return this.withRating(pub);
   }
 
+  /** Profilo dello psicologo loggato, anche se non ancora pubblicato. */
+  async findMine(userId: string) {
+    const p = await this.prisma.psychologist.findUnique({
+      where: { userId },
+      select: this.PUBLIC_SELECT,
+    });
+    if (!p) throw new NotFoundException('Profilo psicologo non trovato');
+    return this.withRating(p);
+  }
+
+  /** Uso interno (controlli di proprietà): ritorna la riga completa, MAI esporre al client. */
   findByUserId(userId: string) {
     return this.prisma.psychologist.findUnique({
       where: { userId },

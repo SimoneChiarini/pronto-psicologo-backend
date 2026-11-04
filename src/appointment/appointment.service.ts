@@ -1,11 +1,11 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
+import { PUBLIC_PSYCH_SELECT } from '../psychologist/psychologist.public';
 import { CreateAppointmentDto } from './dto/create-appointment.dto';
 import { UpdateAppointmentDto } from './dto/update-appointment.dto';
 import { RequestSlotDto } from './dto/request-slot.dto';
-
 const USER_SELECT = { firstName: true, lastName: true, email: true, profileImage: true };
-const PSYCH_INCLUDE = { user: { select: USER_SELECT } };
+
 
 @Injectable()
 export class AppointmentService {
@@ -42,7 +42,7 @@ export class AppointmentService {
         psychologistId: dto.psychologistId,
         status: 'PENDING',
       },
-      include: { psychologist: { include: PSYCH_INCLUDE } },
+      include: { psychologist: { select: PUBLIC_PSYCH_SELECT } },
     });
   }
 
@@ -91,7 +91,7 @@ export class AppointmentService {
   findForUser(userId: string) {
     return this.prisma.appointment.findMany({
       where: { userId },
-      include: { psychologist: { include: PSYCH_INCLUDE } },
+      include: { psychologist: { select: PUBLIC_PSYCH_SELECT } },
       orderBy: { startTime: 'asc' },
     });
   }

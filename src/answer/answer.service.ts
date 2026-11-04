@@ -1,6 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { Prisma, Answer } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
+import { PUBLIC_PSYCH_SELECT } from '../psychologist/psychologist.public';
 import { FirebaseService } from '../firebase/firebase.service';
 
 @Injectable()
@@ -37,11 +38,7 @@ export class AnswerService {
     const answers = await this.prisma.answer.findMany({
       where: { questionId: { in: questionIds } },
       include: {
-        psychologist: {
-          include: {
-            user: { select: { firstName: true, lastName: true } },
-          },
-        },
+        psychologist: { select: PUBLIC_PSYCH_SELECT },
         question: { select: { id: true, title: true, content: true } },
       },
       orderBy: { createdAt: 'desc' },
