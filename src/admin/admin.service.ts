@@ -1,5 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
+import { UpdateSettingsDto } from './dto/update-settings.dto';
 
 @Injectable()
 export class AdminService {
@@ -13,7 +14,7 @@ export class AdminService {
     });
   }
 
-  async updateSettings(data: { radiusKm?: number; expandMinutes?: number; maxAnswers?: number }) {
+  async updateSettings(data: UpdateSettingsDto) {
     return this.prisma.appSettings.upsert({
       where: { id: 'singleton' },
       update: data,

@@ -22,6 +22,7 @@ import { EmailModule } from './email/email.module';
 import { BillingModule } from './billing/billing.module';
 import { ReportModule } from './report/report.module';
 import { AccountModule } from './account/account.module';
+import { ProfessionalModule } from './professional/professional.module';
 
 @Module({
   imports: [
@@ -45,6 +46,7 @@ import { AccountModule } from './account/account.module';
     BillingModule,
     ReportModule,
     AccountModule,
+    ProfessionalModule,
   ],
   controllers: [AppController],
   providers: [

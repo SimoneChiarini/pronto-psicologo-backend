@@ -191,9 +191,36 @@ export class AccountExportService {
           orderBy: { createdAt: 'asc' },
           select: { rating: true, comment: true, createdAt: true, User: { select: { firstName: true } } },
         },
+        // Area professionisti
+        casesAuthored: {
+          orderBy: { createdAt: 'asc' },
+          select: {
+            title: true, ageRange: true, setting: true, presentingProblem: true, question: true,
+            status: true, createdAt: true, group: { select: { name: true, type: true } },
+          },
+        },
+        caseMessages: {
+          where: { deletedAt: null },
+          orderBy: { createdAt: 'asc' },
+          select: { content: true, createdAt: true, case: { select: { title: true } } },
+        },
+        supervisorProfile: {
+          select: {
+            active: true, bio: true, orientation: true, yearsExperience: true,
+            priceIndividualCents: true, pricePerParticipantCents: true,
+          },
+        },
+        supervisionSeats: {
+          select: {
+            status: true, paymentStatus: true, amountCents: true, paidAt: true,
+            supervision: { select: { title: true, mode: true, status: true, createdAt: true } },
+          },
+        },
       },
     });
-    const { specializations, answers, posts, Review, ...profile } = p;
+    const {
+      specializations, answers, posts, Review, casesAuthored, caseMessages, supervisorProfile, supervisionSeats, ...profile
+    } = p;
     return {
       ...profile,
       specializations: specializations.map(s => TAG_LABEL_MAP.get(s.tagCode) ?? s.tagCode),
@@ -203,6 +230,12 @@ export class AccountExportService {
       reviewsReceived: Review.map(r => ({
         from: r.User.firstName, rating: r.rating, comment: r.comment, createdAt: r.createdAt,
       })),
+      professionalArea: {
+        casesPresented: casesAuthored.map(({ group, ...c }) => ({ ...c, group: group.name, groupType: group.type })),
+        messagesWritten: caseMessages.map(m => ({ case: m.case.title, content: m.content, createdAt: m.createdAt })),
+        supervisorProfile,
+        supervisionsJoined: supervisionSeats.map(s => ({ ...s.supervision, myStatus: s.status, payment: s.paymentStatus, amountCents: s.amountCents, paidAt: s.paidAt })),
+      },
     };
   }
 }

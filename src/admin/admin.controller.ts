@@ -1,5 +1,6 @@
 import { Controller, Get, Patch, Param, Body, UseGuards, Request, ForbiddenException } from '@nestjs/common';
 import { AdminService } from './admin.service';
+import { UpdateSettingsDto } from './dto/update-settings.dto';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 
 @UseGuards(JwtAuthGuard)
@@ -18,7 +19,7 @@ export class AdminController {
   }
 
   @Patch('settings')
-  updateSettings(@Request() req, @Body() body: { radiusKm?: number; expandMinutes?: number; maxAnswers?: number }) {
+  updateSettings(@Request() req, @Body() body: UpdateSettingsDto) {
     this.checkAdmin(req);
     return this.adminService.updateSettings(body);
   }

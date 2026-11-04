@@ -7,5 +7,6 @@ import { ReportController } from './report.controller';
   imports: [PrismaModule],
   providers: [ReportService],
   controllers: [ReportController],
+  exports: [ReportService],
 })
 export class ReportModule {}

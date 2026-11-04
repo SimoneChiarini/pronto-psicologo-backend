@@ -1,7 +1,7 @@
-import { ConflictException, ForbiddenException, Injectable, Logger, NotFoundException } from '@nestjs/common';
+import { BadRequestException, ConflictException, ForbiddenException, Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { EmailService } from '../email/email.service';
-import { CreateReportDto } from './dto/create-report.dto';
+import { CaseMessageReportDto, CreateReportDto } from './dto/create-report.dto';
 import { UpdateReportDto } from './dto/update-report.dto';
 import { REPORT_REASONS, ReportReason } from './report.constants';
 
@@ -69,12 +69,68 @@ export class ReportService {
     return { id: report.id, status: report.status };
   }
 
+  /**
+   * Segnalazione di un messaggio in un gruppo professionisti. Il segnalante deve
+   * essere membro attivo del gruppo; il segnalato è l'autore del messaggio.
+   * È l'unico modo in cui l'admin vede un contenuto dell'area professionisti.
+   */
+  async createForCaseMessage(reporterUserId: string, reporterPsychId: string, messageId: string, dto: CaseMessageReportDto) {
+    const msg = await this.prisma.caseMessage.findUnique({
+      where: { id: messageId },
+      select: {
+        id: true, deletedAt: true,
+        author: { select: { userId: true } },
+        case: { select: { groupId: true } },
+      },
+    });
+    if (!msg || msg.deletedAt) throw new NotFoundException('Messaggio non trovato');
+    const member = await this.prisma.peerGroupMember.findUnique({
+      where: { groupId_psychologistId: { groupId: msg.case.groupId, psychologistId: reporterPsychId } },
+      select: { status: true },
+    });
+    if (member?.status !== 'ACTIVE') throw new NotFoundException('Messaggio non trovato');
+    if (!msg.author) throw new BadRequestException('L\'autore di questo messaggio non è più iscritto');
+    if (msg.author.userId === reporterUserId) throw new BadRequestException('Non puoi segnalare un tuo messaggio');
+
+    const pending = await this.prisma.report.findFirst({
+      where: { reporterUserId, caseMessageId: messageId, status: { in: ['OPEN', 'IN_REVIEW'] } },
+      select: { id: true },
+    });
+    if (pending) throw new ConflictException('Hai già segnalato questo messaggio');
+
+    const reportedUser = await this.prisma.user.findUniqueOrThrow({
+      where: { id: msg.author.userId },
+      select: { firstName: true, lastName: true, role: true },
+    });
+    const report = await this.prisma.report.create({
+      data: {
+        reporterUserId,
+        reportedUserId: msg.author.userId,
+        reportedLabel: userLabel(reportedUser),
+        caseMessageId: messageId,
+        reason: dto.reason,
+        details: dto.details?.trim() || null,
+      },
+      include: { reporter: USER_SUMMARY, reported: USER_SUMMARY },
+    });
+    void this.notifyAdmins({ reason: report.reason, reporter: report.reporter!, reported: report.reported! })
+      .catch(e => this.logger.error('Notifica segnalazione fallita: ' + e.message));
+    return { id: report.id, status: report.status };
+  }
+
   findAll(status?: string) {
     return this.prisma.report.findMany({
       where: status ? { status } : undefined,
       include: {
         reporter: USER_SUMMARY,
         reported: USER_SUMMARY,
+        // Messaggio segnalato nell'area professionisti: l'admin vede SOLO questo messaggio
+        caseMessage: {
+          select: {
+            content: true, deletedAt: true, createdAt: true,
+            case: { select: { title: true, group: { select: { name: true, type: true } } } },
+          },
+        },
         // Stessa forma di /admin/conversations, per riusare il visualizzatore messaggi admin
         conversation: {
           select: {
